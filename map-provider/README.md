@@ -1,42 +1,38 @@
 # Map Provider
 
-A FastAPI service that dynamically discovers Cloud Optimized GeoTIFFs (COGs) in a shared data directory and serves them as XYZ tiles via TiTiler, plus an interactive Leaflet demo page.
+The `map-provider` microservice is the raster listing and tile-serving backend.
 
-## Endpoints
+It scans the shared data directory for TIFF and VRT files and exposes them to the frontend for preview and map display. It does not manage map sets and it does not calculate heights.
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/` | Redirects to `/demo` |
-| `GET` | `/layers` | Lists all discovered `.tif` files |
-| `GET` | `/demo` | Interactive Leaflet map UI |
-| `GET` | `/cog/tiles/...` | XYZ tiles via TiTiler |
-| `GET` | `/cog/info` | COG metadata |
+## Responsibilities
 
-## Running
+- list available raster-like layers from the shared data directory
+- expose TiTiler endpoints for tile access
+- provide preview and metadata endpoints for the frontend
 
-### Docker (recommended — run from root with sibling height-server)
-```bash
-# From d:/Courses/MAPS/israel/
-docker compose up map-provider
-```
+## Runtime Role
 
-### Local (pixi)
-```bash
-cd map-provider
-pixi run start
-```
+This service powers the map view:
 
-Set `DATA_DIR` env var to point to the shared data folder.  
-Default: `./data` relative to the service root.
+- `map-provider-ui` calls `/layers` to discover available layers
+- proxy tile mode uses TiTiler routes under `/cog`
+- preview and visualization requests stay here, not in `height-server`
 
-## Dependencies
+## Boundaries
 
-- **TiTiler**: Dynamic tile server built on rio-tiler + rasterio
-- **Rasterio**: Reads GeoTIFF/COG files (ships with bundled GDAL — no system install needed)
-- **FastAPI + Uvicorn**: HTTP server
+This service should not own:
 
-## Environment Variables
+- DTM selection state
+- VRT map-set creation workflows
+- elevation calculations
 
-| Variable | Default | Description |
-|---|---|---|
-| `DATA_DIR` | `./data` | Path to the shared data directory containing `.tif` files |
+Those concerns belong to `map-manager` and `height-server`.
+
+## Local Focus
+
+If you are changing this service, you are usually working on:
+
+- layer discovery
+- tile serving
+- raster previews
+- map-facing metadata

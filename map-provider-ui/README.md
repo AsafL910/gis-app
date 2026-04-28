@@ -1,70 +1,38 @@
 # Map Provider UI
 
-A small React + Vite + TypeScript + OpenLayers app for debugging the `map-provider` backend.
+The `map-provider-ui` microservice is the frontend for the GIS demo.
 
-## What it does
+It gives users a single interface for:
 
-- shows a plain OpenStreetMap basemap
-- fetches available layers from `/api/layers`
-- lets you switch between:
-  - proxy tiles via `/api/cog/tiles/...`
-  - direct COG loading via OpenLayers `GeoTIFF` from `/cog-data/<filename>`
-- keeps a visible in-app event log for layer fetches and tile load events
+- browsing raster and DTM sources
+- creating VRT-backed map sets
+- previewing rasters on the map
+- selecting the active DTM for the session
+- drawing polygons and requesting highest-point calculations
 
-## Expected backend
+## Runtime Role
 
-By default, the Vite dev server proxies `/api/*` to:
+This UI coordinates the other services:
 
-`http://127.0.0.1:8010`
+- `map-manager` for cataloging, VRT generation, and DTM selection
+- `map-provider` for raster listing and tile access
+- `height-server` for GDAL-based height calculations
+- `data-http` for direct COG loading
 
-And proxies `/cog-data/*` to:
+## Proxied APIs
 
-`http://127.0.0.1:8011`
+In Docker, nginx serves the built app and proxies:
 
-That matches:
+- `/api/*` to `map-provider`
+- `/management-api/*` to `map-manager`
+- `/height-api/*` to `height-server`
+- `/cog-data/*` to `data-http`
 
-- `map-provider` on port `8010`
-- `data-http` on port `8011`
+## Local Focus
 
-## Run Locally
+If you are changing this service, you are usually working on:
 
-```bash
-cd map-provider-ui
-npm install
-npm run dev
-```
-
-Then open:
-
-`http://127.0.0.1:5173`
-
-For direct COG mode, also start the HTTP file server for `./data`, for example with:
-
-```bash
-docker compose up data-http map-provider
-```
-
-## Run In Docker
-
-The full stack can now run in Docker, including the client served by nginx:
-
-```bash
-docker compose up --build
-```
-
-Then open:
-
-`http://127.0.0.1:8013`
-
-The nginx container serves the built app and proxies:
-
-- `/api/*` -> `map-provider`
-- `/cog-data/*` -> `data-http`
-- `/height-api/*` -> `height-server`
-
-## Debugging tips
-
-- open the browser devtools network tab and watch `/api/layers`
-- if the basemap appears but the raster does not, watch for `/api/cog/tiles/...` requests
-- in direct mode, watch for `/cog-data/<filename>` requests
-- the sidebar log will also show tile load errors from OpenLayers
+- React/OpenLayers map behavior
+- map-set creation UX
+- dataset selection UX
+- request wiring between frontend and backend services

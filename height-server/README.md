@@ -1,80 +1,45 @@
-# Height Calculation Server
+# Height Server
 
-A FastAPI service that provides elevation queries over GeoTIFF files using GDAL. It can
-also auto-build a VRT mosaic from split top/bottom elevation COGs and query that merged
-surface.
+The `height-server` microservice is the GDAL-backed calculation service.
 
-## Endpoints
+Its job is intentionally narrow:
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/dataset-info/` | Show the currently loaded dataset path and metadata |
-| `POST` | `/reload-dataset/` | Rebuild/reload the configured dataset |
-| `POST` | `/get-elevation/` | Get elevation at a lat/lon coordinate |
-| `POST` | `/get-highest-point/` | Find highest point within a polygon |
+- open elevation datasets with GDAL
+- transform coordinates into the dataset spatial reference system
+- sample elevations at a point
+- find the highest point inside a polygon
 
-### `POST /get-elevation/`
-```json
-// Request
-{ "latitude": 32.0853, "longitude": 34.7818 }
+It is not responsible for cataloging files, creating map sets, or managing VRT workflows. Those responsibilities live in `map-manager`.
 
-// Response
-{ "latitude": 32.0853, "longitude": 34.7818, "elevation": 50 }
-```
+## Responsibilities
 
-### `POST /get-highest-point/`
-```json
-// Request
-{
-  "coordinates": [
-    { "latitude": 32.0853, "longitude": 34.7818 },
-    { "latitude": 32.0850, "longitude": 34.7820 },
-    { "latitude": 32.0845, "longitude": 34.7815 }
-  ]
-}
+- `POST /get-elevation/`
+- `POST /get-highest-point/`
+- `POST /get-highest-point-geojson/`
+- `GET /dataset-info/`
+- `POST /reload-dataset/`
 
-// Response
-{ "highest_elevation": 120, "coordinate": { "latitude": 32.0851, "longitude": 34.7819 } }
-```
+Requests can include `dataset_path` so the caller can choose which DTM or VRT to query.
 
-## Running
+## Runtime Role
 
-### Docker (recommended — run from root with sibling map-provider)
-```bash
-# From d:/Courses/MAPS/israel/
-docker compose up height-server
-```
+This service is used when the application needs actual elevation results.
 
-### Local (pixi)
-```bash
-cd height-server
-pixi run start
-```
+- The UI selects a DTM through `map-manager`.
+- The selected dataset path is sent along with height requests.
+- `height-server` loads that dataset and performs the GDAL work.
 
-Set `DATA_DIR` env var to point to the shared data folder.  
-Default: `./data` relative to the service root.
+## Notes
 
-By default the server now uses:
+- `DATA_DIR` points to the shared `/data` mount.
+- If no explicit `dataset_path` is sent, the service falls back to `ELEV_FILENAME`.
+- If the default dataset is a missing `.vrt`, the server can still build the configured default VRT from the top and bottom source files.
 
-- `israel_merged.vrt`
+## Local Focus
 
-If that VRT does not exist and `ELEV_FILENAME` ends with `.vrt`, the server will try to
-build it automatically from:
+If you are changing this service, you are usually working on:
 
-- `israel_top_cog.tif`
-- `israel_bottom_cog.tif`
-
-## Dependencies
-
-- **GDAL / OGR**: Core geospatial library (installed via apt in Docker, via conda in pixi)
-- **FastAPI + Uvicorn**: HTTP server
-
-## Environment Variables
-
-| Variable | Default | Description |
-|---|---|---|
-| `DATA_DIR` | `./data` | Path to the shared data directory |
-| `ELEV_FILENAME` | `israel_merged.vrt` | Elevation dataset filename within DATA_DIR |
-| `ELEV_VRT_FILENAME` | `israel_merged.vrt` | Output VRT filename to build when needed |
-| `TOP_ELEV_FILENAME` | `israel_top_cog.tif` | Top half source for VRT building |
-| `BOTTOM_ELEV_FILENAME` | `israel_bottom_cog.tif` | Bottom half source for VRT building |
+- GDAL dataset loading
+- raster sampling logic
+- polygon scan logic
+- coordinate transforms
