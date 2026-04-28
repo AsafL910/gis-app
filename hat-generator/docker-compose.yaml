@@ -1,0 +1,11 @@
+services:
+  hat-generator-server:
+    build: .
+    image: rio-api-server
+    container_name: rio_api_server
+    ports:
+      - "9000:9000"
+    volumes:
+      # - ./app:/home/data
+      - ./src:/opt/dem/src
+      - ./data:/opt/dem/data

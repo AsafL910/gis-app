@@ -1,0 +1,46 @@
+services:
+  map-provider-ui:
+    build: ./map-provider-ui
+    container_name: map_provider_ui
+    ports:
+      - "8013:80"
+    depends_on:
+      - map-provider
+      - height-server
+      - data-http
+
+  data-http:
+    image: nginx:alpine
+    container_name: data_http
+    ports:
+      - "8011:80"
+    volumes:
+      - ./data:/usr/share/nginx/html:ro
+      - ./data-http/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+  height-server:
+    build: ./height-server
+    container_name: height_server
+    ports:
+      - "8009:8001"
+    volumes:
+      - ./height-server/src:/app/src  # hot-reload support
+      - ./data:/data                  # shared read/write data volume
+    environment:
+      DATA_DIR: /data
+      ELEV_FILENAME: dtm/israel_merged.vrt
+      TOP_ELEV_FILENAME: israel_top_cog.tif
+      BOTTOM_ELEV_FILENAME: israel_bottom_cog.tif
+    command: uvicorn src.app:app --host 0.0.0.0 --port 8001 --reload
+
+  map-provider:
+    build: ./map-provider
+    container_name: map_provider
+    ports:
+      - "8010:8000"
+    volumes:
+      - ./map-provider/src:/app/src   # hot-reload support
+      - ./data:/data                  # same shared data volume (read-only for now)
+    environment:
+      DATA_DIR: /data
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload

@@ -1,0 +1,24 @@
+[workspace]
+authors = ["Asaf Lumer <asaflumer@gmail.com>"]
+channels = [
+    "conda-forge",
+    "https://repo.anaconda.com/pkgs/main",
+    "https://repo.anaconda.com/pkgs/r",
+    "https://repo.anaconda.com/pkgs/msys2",
+]
+name = "map-provider"
+platforms = ["win-64"]
+version = "0.1.0"
+
+[tasks]
+start = "uvicorn src.main:app --reload --host 0.0.0.0 --port 8000"
+
+[dependencies]
+python = "==3.12"
+fastapi = "*"
+uvicorn = "*"
+pip = "*"
+
+[pypi-dependencies]
+rasterio = "*"
+"titiler.core" = "*"

@@ -1,0 +1,72 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+.venv/
+venv/
+env/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+
+# Pixi / Conda / local envs
+.pixi/
+conda_packages/
+
+# Build / runtime artifacts
+coverage/
+tmp/
+temp/
+scratch/
+
+# Docker / local overrides
+.env
+.env.*
+docker-compose.override.yml
+
+# Generated geodata / archives
+*.vrt
+*.aux.xml
+*.ovr
+*.tfw
+*.idx
+*.tar
+*.zip
+error.log
+
+# Ignore generated map sets, but keep the folder
+data/mapsets/*
+!data/mapsets/.gitkeep
+
+# Ignore bulky local data by default, but keep folder structure
+data/dtm/*
+data/raster/*
+!data/dtm/.gitkeep
+!data/raster/.gitkeep
+
+# If you want to keep specific small sample files, add them explicitly below.
