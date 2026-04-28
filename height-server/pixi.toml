@@ -1,0 +1,22 @@
+[workspace]
+authors = ["Asaf Lumer <asaflumer@gmail.com>"]
+channels = [
+    "conda-forge",
+    "https://repo.anaconda.com/pkgs/main",
+    "https://repo.anaconda.com/pkgs/r",
+    "https://repo.anaconda.com/pkgs/msys2",
+]
+name = "height-server"
+platforms = ["win-64"]
+version = "0.1.0"
+
+[tasks]
+start = "uvicorn src.app:app --reload --host 0.0.0.0 --port 8001"
+
+[dependencies]
+python = "==3.12"
+fastapi = "*"
+gdal = "*"
+uvicorn = "*"
+pip = "*"
+pyproj = "*"
