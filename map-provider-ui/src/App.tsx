@@ -82,6 +82,7 @@ const DEFAULT_CENTER: [number, number] = [34.8, 31.5];
 const API_BASE = "/api";
 const DIRECT_DATA_BASE = "/cog-data";
 const HEIGHT_API_BASE = "/height-api";
+const MANAGEMENT_API_BASE = "/management-api";
 
 const terrainRgbElevation = [
   "+",
@@ -407,7 +408,7 @@ function App() {
   }
 
   const refreshCatalog = useCallback(async () => {
-    const response = await fetch(`${HEIGHT_API_BASE}/catalog/`);
+    const response = await fetch(`${MANAGEMENT_API_BASE}/catalog/`);
     if (!response.ok) {
       throw new Error(`Catalog HTTP ${response.status}`);
     }
@@ -445,7 +446,7 @@ function App() {
 
   async function activateDtm(path: string) {
     try {
-      const response = await fetch(`${HEIGHT_API_BASE}/activate-dtm/`, {
+      const response = await fetch(`${MANAGEMENT_API_BASE}/activate-dtm/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path })
@@ -465,7 +466,7 @@ function App() {
     setIsCreatingMapSet(true);
     setStatus("Creating map set");
     try {
-      const response = await fetch(`${HEIGHT_API_BASE}/map-sets/`, {
+      const response = await fetch(`${MANAGEMENT_API_BASE}/map-sets/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -779,7 +780,10 @@ function App() {
       const response = await fetch(`${HEIGHT_API_BASE}/get-highest-point-geojson/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(polygonGeoJson)
+        body: JSON.stringify({
+          dataset_path: catalog.active_dataset,
+          geojson: polygonGeoJson
+        })
       });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);

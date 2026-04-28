@@ -21,6 +21,11 @@ export default defineConfig({
         target: "http://127.0.0.1:8009",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/height-api/, "")
+      },
+      "/management-api": {
+        target: "http://127.0.0.1:8008",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/management-api/, "")
       }
     }
   }

@@ -6,6 +6,7 @@ services:
       - "8013:80"
     depends_on:
       - map-provider
+      - map-manager
       - height-server
       - data-http
 
@@ -32,6 +33,18 @@ services:
       TOP_ELEV_FILENAME: israel_top_cog.tif
       BOTTOM_ELEV_FILENAME: israel_bottom_cog.tif
     command: uvicorn src.app:app --host 0.0.0.0 --port 8001 --reload
+
+  map-manager:
+    build: ./map-manager
+    container_name: map_manager
+    ports:
+      - "8008:8002"
+    volumes:
+      - ./map-manager/src:/app/src
+      - ./data:/data
+    environment:
+      DATA_DIR: /data
+      PORT: 8002
 
   map-provider:
     build: ./map-provider
