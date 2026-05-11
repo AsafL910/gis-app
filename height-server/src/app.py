@@ -1,13 +1,12 @@
-import os
 from fastapi import FastAPI
-from src.calc_server import router as calc_router
+from src.routes.elevation import router as elevation_router
 
 app = FastAPI(
     title="Height Calculation Server",
     description="Dedicated server for elevation and spatial calculations via GDAL"
 )
 
-app.include_router(calc_router)
+app.include_router(elevation_router)
 
 if __name__ == "__main__":
     import uvicorn

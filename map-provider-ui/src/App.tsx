@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "ol/ol.css";
-import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import GeoJSON from "ol/format/GeoJSON";
 import Map from "ol/Map";
 import View from "ol/View";
@@ -12,347 +11,13 @@ import XYZ from "ol/source/XYZ";
 import OSM from "ol/source/OSM";
 import GeoTIFF from "ol/source/GeoTIFF";
 import VectorSource from "ol/source/Vector";
-import Fill from "ol/style/Fill";
-import Stroke from "ol/style/Stroke";
-import Style from "ol/style/Style";
-import CircleStyle from "ol/style/Circle";
 import { fromLonLat } from "ol/proj";
-
-type LayerRecord = {
-  name: string;
-  path: string;
-  url: string;
-};
-
-type LayersResponse = {
-  layers: LayerRecord[];
-};
-
-type CatalogFile = {
-  name: string;
-  path: string;
-  size: number;
-};
-
-type CatalogResponse = {
-  rasters: CatalogFile[];
-  dtms: CatalogFile[];
-  map_sets: MapSetManifest[];
-  active_dataset: string | null;
-};
-
-type MapSetManifest = {
-  name: string;
-  manifest_path: string;
-  raster_files: string[];
-  dtm_files: string[];
-  dtm_vrt: string | null;
-};
-
-type MapSetCreateResponse = {
-  name: string;
-  manifest_path: string;
-  rasters: string[];
-  dtm_vrt: string | null;
-  active_dataset: string | null;
-};
-
-type HighestPointResponse = {
-  type: "FeatureCollection";
-  features: Array<{
-    type: "Feature";
-    geometry: { type: "Point"; coordinates: [number, number] };
-    properties: { highest_elevation: number; dataset_path: string };
-  }>;
-  highest_elevation: number;
-  dataset_path: string;
-};
-
-type SourceMode = "proxy" | "direct";
-type RasterMode = "terrain-rgb" | "single-band" | "imagery";
-type HoverState = {
-  x: number;
-  y: number;
-  value: number;
-} | null;
-
-type RasterStyle = { color: unknown };
-
-const DEFAULT_CENTER: [number, number] = [34.8, 31.5];
-const API_BASE = "/api";
-const DIRECT_DATA_BASE = "/cog-data";
-const HEIGHT_API_BASE = "/height-api";
-const MANAGEMENT_API_BASE = "/management-api";
-
-const terrainRgbElevation = [
-  "+",
-  -10000,
-  ["*", 0.1 * 255 * 256 * 256, ["band", 1]],
-  ["*", 0.1 * 255 * 256, ["band", 2]],
-  ["*", 0.1 * 255, ["band", 3]]
-];
-
-const singleBandElevation = ["band", 1];
-
-const drawLayerStyle = new Style({
-  stroke: new Stroke({
-    color: "#38bdf8",
-    width: 2
-  }),
-  fill: new Fill({
-    color: "rgba(56, 189, 248, 0.16)"
-  })
-});
-
-const highestPointStyle = new Style({
-  image: new CircleStyle({
-    radius: 7,
-    fill: new Fill({ color: "#ef4444" }),
-    stroke: new Stroke({ color: "#ffffff", width: 2 })
-  })
-});
-
-function getElevationExpression(rasterMode: RasterMode) {
-  return rasterMode === "single-band" ? singleBandElevation : terrainRgbElevation;
-}
-
-function getColorExpression(rasterMode: RasterMode, level: number) {
-  const elevation = getElevationExpression(rasterMode);
-
-  return [
-    "case",
-    ["<=", ["-", level, elevation], 100],
-    [255, 0, 0, 1],
-    ["between", ["-", level, elevation], 100, 250],
-    [255, 255, 0, 1],
-    [">=", ["-", level, elevation], 400],
-    [0, 255, 0, 1],
-    [0, 0, 0, 0]
-  ];
-}
-
-function decodeTerrainRgb(sample: ArrayLike<number>) {
-  const r = sample[0] ?? 0;
-  const g = sample[1] ?? 0;
-  const b = sample[2] ?? 0;
-  return r * 256 * 256 * 0.1 + g * 256 * 0.1 + b * 0.1 - 10000;
-}
-
-function decodeDirectCog(sample: ArrayLike<number>) {
-  if (sample.length >= 3) {
-    return decodeTerrainRgb(sample);
-  }
-
-  return Number(sample[0] ?? 0);
-}
-
-function getDefaultRasterMode(layerName: string): RasterMode {
-  if (/raster\.vrt$/i.test(layerName) || /(^|\/)raster\//i.test(layerName) || /rgb/i.test(layerName)) {
-    return "imagery";
-  }
-
-  return "single-band";
-}
-
-function formatBytes(size: number) {
-  if (size < 1024) {
-    return `${size} B`;
-  }
-  if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(1)} KB`;
-  }
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function encodeDataPath(path: string) {
-  return path.split("/").map(encodeURIComponent).join("/");
-}
-
-type FileSelectionTableProps = {
-  title: string;
-  rows: CatalogFile[];
-  selectedPaths: string[];
-  onToggle: (path: string) => void;
-};
-
-function FileSelectionTable({ title, rows, selectedPaths, onToggle }: FileSelectionTableProps) {
-  const selectedSet = useMemo(() => new Set(selectedPaths), [selectedPaths]);
-  const columnHelper = createColumnHelper<CatalogFile>();
-  const columns = useMemo(
-    () => [
-      columnHelper.display({
-        id: "select",
-        header: "",
-        cell: ({ row }) => (
-          <input
-            type="checkbox"
-            checked={selectedSet.has(row.original.path)}
-            onChange={() => onToggle(row.original.path)}
-          />
-        )
-      }),
-      columnHelper.accessor("name", {
-        header: "Name",
-        cell: (info) => info.getValue()
-      }),
-      columnHelper.accessor("path", {
-        header: "Path",
-        cell: (info) => <code>{info.getValue()}</code>
-      }),
-      columnHelper.accessor("size", {
-        header: "Size",
-        cell: (info) => formatBytes(info.getValue())
-      })
-    ],
-    [columnHelper, onToggle, selectedSet]
-  );
-
-  const table = useReactTable({
-    data: rows,
-    columns,
-    getCoreRowModel: getCoreRowModel()
-  });
-
-  return (
-    <div className="panel">
-      <div className="panel-heading">
-        <h2>{title}</h2>
-        <span className="muted small">{selectedPaths.length} selected</span>
-      </div>
-      <div className="table-wrap">
-        <table className="data-table">
-          <thead>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <th key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.map((row) => (
-              <tr key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="muted">No files found.</td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-type MapSetTableProps = {
-  rows: MapSetManifest[];
-  activeDataset: string | null;
-  onPreview: (path: string) => void;
-  onActivate: (path: string) => void;
-};
-
-function MapSetTable({ rows, activeDataset, onPreview, onActivate }: MapSetTableProps) {
-  const columnHelper = createColumnHelper<MapSetManifest>();
-  const columns = useMemo(
-    () => [
-      columnHelper.accessor("name", {
-        header: "Map Set",
-        cell: (info) => info.getValue()
-      }),
-      columnHelper.accessor("raster_files", {
-        header: "Rasters",
-        cell: (info) => info.getValue().length
-      }),
-      columnHelper.accessor("dtm_vrt", {
-        header: "DTM VRT",
-        cell: (info) => <code>{info.getValue()}</code>
-      }),
-      columnHelper.display({
-        id: "actions",
-        header: "Actions",
-        cell: ({ row }) => (
-          <div className="inline-actions">
-            <button
-              type="button"
-              className="segment"
-              disabled={row.original.raster_files.length === 0}
-              onClick={() => onPreview(row.original.raster_files[0] ?? "")}
-            >
-              Preview
-            </button>
-            {row.original.dtm_vrt ? (
-              <button
-                type="button"
-                className={activeDataset === row.original.dtm_vrt ? "segment active" : "segment"}
-                onClick={() => onActivate(row.original.dtm_vrt!)}
-              >
-                {activeDataset === row.original.dtm_vrt ? "Active" : "Activate"}
-              </button>
-            ) : null}
-          </div>
-        )
-      })
-    ],
-    [activeDataset, onActivate, onPreview]
-  );
-
-  const table = useReactTable({
-    data: rows,
-    columns,
-    getCoreRowModel: getCoreRowModel()
-  });
-
-  return (
-    <div className="panel">
-      <h2>Generated Map Sets</h2>
-      <div className="table-wrap">
-        <table className="data-table">
-          <thead>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <th key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.map((row) => (
-              <tr key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="muted">No generated map sets yet.</td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
+import { fetchCatalog, fetchLayers, postActivateDtm, postCreateMapSet, postHighestPoint } from "./api";
+import { DEFAULT_CENTER, DIRECT_DATA_BASE, API_BASE, drawLayerStyle, highestPointStyle } from "./constants";
+import { FileSelectionTable } from "./components/FileSelectionTable";
+import { MapSetTable } from "./components/MapSetTable";
+import type { CatalogResponse, HoverState, LayerRecord, RasterMode, RasterStyle, SourceMode } from "./types";
+import { decodeDirectCog, decodeTerrainRgb, encodeDataPath, getColorExpression, getDefaultRasterMode } from "./utils/raster";
 
 function App() {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
@@ -408,21 +73,13 @@ function App() {
   }
 
   const refreshCatalog = useCallback(async () => {
-    const response = await fetch(`${MANAGEMENT_API_BASE}/catalog/`);
-    if (!response.ok) {
-      throw new Error(`Catalog HTTP ${response.status}`);
-    }
-    const data = (await response.json()) as CatalogResponse;
+    const data = await fetchCatalog();
     setCatalog(data);
     return data;
   }, []);
 
   const refreshLayers = useCallback(async (preferredPath?: string) => {
-    const response = await fetch(`${API_BASE}/layers`);
-    if (!response.ok) {
-      throw new Error(`Layers HTTP ${response.status}`);
-    }
-    const data = (await response.json()) as LayersResponse;
+    const data = await fetchLayers();
     setLayers(data.layers);
     setSelectedLayerPath((current) => {
       if (preferredPath && data.layers.some((layer) => layer.path === preferredPath)) {
@@ -446,14 +103,7 @@ function App() {
 
   async function activateDtm(path: string) {
     try {
-      const response = await fetch(`${MANAGEMENT_API_BASE}/activate-dtm/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path })
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      await postActivateDtm(path);
       await refreshCatalog();
       addLog(`Activated DTM dataset ${path}`);
     } catch (error) {
@@ -466,20 +116,12 @@ function App() {
     setIsCreatingMapSet(true);
     setStatus("Creating map set");
     try {
-      const response = await fetch(`${MANAGEMENT_API_BASE}/map-sets/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: mapSetName,
-          raster_files: selectedRasterPaths,
-          dtm_files: selectedDtmPaths,
-          activate_dtm: true
-        })
+      const result = await postCreateMapSet({
+        name: mapSetName,
+        raster_files: selectedRasterPaths,
+        dtm_files: selectedDtmPaths,
+        activate_dtm: true
       });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const result = (await response.json()) as MapSetCreateResponse;
       await refreshCatalog();
       await refreshLayers(result.rasters[0] ?? result.dtm_vrt ?? undefined);
       if (result.rasters.length > 0) {
@@ -777,19 +419,10 @@ function App() {
     addLog("Posting polygon GeoJSON to height server");
 
     try {
-      const response = await fetch(`${HEIGHT_API_BASE}/get-highest-point-geojson/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dataset_path: catalog.active_dataset,
-          geojson: polygonGeoJson
-        })
+      const payload = await postHighestPoint({
+        dataset_path: catalog.active_dataset,
+        geojson: polygonGeoJson
       });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const payload = (await response.json()) as HighestPointResponse;
       resultSourceRef.current.clear();
       const pointFeatures = geoJsonFormatRef.current.readFeatures(payload, {
         dataProjection: "EPSG:4326",
