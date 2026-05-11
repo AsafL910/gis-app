@@ -13,6 +13,7 @@ Key services:
 - `map-provider`: FastAPI + TiTiler service for listing available rasters and serving tile layers.
 - `height-server`: FastAPI + GDAL service for elevation lookups and highest-point calculations.
 - `data-http`: Nginx file server exposing the shared `data/` directory for direct COG access.
+- `mongo-transaction-demo`: .NET 8 example worker that opens a MongoDB transaction against the packaged replica set.
 
 ## Architecture
 

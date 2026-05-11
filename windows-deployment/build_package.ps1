@@ -174,6 +174,45 @@ function Test-PythonEnv {
     }
 }
 
+function Invoke-WithDotnetEnv {
+    param(
+        [scriptblock]$Command
+    )
+
+    $previousDotnetCliHome = $env:DOTNET_CLI_HOME
+    $previousDotnetTelemetry = $env:DOTNET_CLI_TELEMETRY_OPTOUT
+    $previousDotnetLookup = $env:DOTNET_MULTILEVEL_LOOKUP
+    $previousNugetPackages = $env:NUGET_PACKAGES
+    $previousAppData = $env:APPDATA
+    $previousLocalAppData = $env:LOCALAPPDATA
+    $dotnetCliHome = Join-Path $SCRIPT_DIR ".dotnet-cli"
+    $nugetPackages = Join-Path $SCRIPT_DIR ".nuget-packages"
+    $appDataRoot = Join-Path $SCRIPT_DIR ".appdata"
+    $roamingAppData = Join-Path $appDataRoot "Roaming"
+    $localAppData = Join-Path $appDataRoot "Local"
+
+    try {
+        New-Item -ItemType Directory -Force -Path $dotnetCliHome | Out-Null
+        New-Item -ItemType Directory -Force -Path $nugetPackages | Out-Null
+        New-Item -ItemType Directory -Force -Path $roamingAppData | Out-Null
+        New-Item -ItemType Directory -Force -Path $localAppData | Out-Null
+        $env:DOTNET_CLI_HOME = $dotnetCliHome
+        $env:DOTNET_CLI_TELEMETRY_OPTOUT = "1"
+        $env:DOTNET_MULTILEVEL_LOOKUP = "0"
+        $env:NUGET_PACKAGES = $nugetPackages
+        $env:APPDATA = $roamingAppData
+        $env:LOCALAPPDATA = $localAppData
+        & $Command
+    } finally {
+        if ($null -ne $previousDotnetCliHome) { $env:DOTNET_CLI_HOME = $previousDotnetCliHome } else { Remove-Item Env:DOTNET_CLI_HOME -ErrorAction SilentlyContinue }
+        if ($null -ne $previousDotnetTelemetry) { $env:DOTNET_CLI_TELEMETRY_OPTOUT = $previousDotnetTelemetry } else { Remove-Item Env:DOTNET_CLI_TELEMETRY_OPTOUT -ErrorAction SilentlyContinue }
+        if ($null -ne $previousDotnetLookup) { $env:DOTNET_MULTILEVEL_LOOKUP = $previousDotnetLookup } else { Remove-Item Env:DOTNET_MULTILEVEL_LOOKUP -ErrorAction SilentlyContinue }
+        if ($null -ne $previousNugetPackages) { $env:NUGET_PACKAGES = $previousNugetPackages } else { Remove-Item Env:NUGET_PACKAGES -ErrorAction SilentlyContinue }
+        if ($null -ne $previousAppData) { $env:APPDATA = $previousAppData } else { Remove-Item Env:APPDATA -ErrorAction SilentlyContinue }
+        if ($null -ne $previousLocalAppData) { $env:LOCALAPPDATA = $previousLocalAppData } else { Remove-Item Env:LOCALAPPDATA -ErrorAction SilentlyContinue }
+    }
+}
+
 if (Test-Path $PKG) {
     Stop-ProcessesUnderPath -RootPath $PKG
     Start-Sleep -Seconds 1
@@ -249,6 +288,21 @@ if (-not (Test-Path $MONGOSH_DIR)) {
     Write-Host "[mongo] mongosh v$MONGOSH_VERSION cached." -ForegroundColor Green
 }
 
+$DOTNET_VERSION = "8.0.420"
+$DOTNET_ZIP = Join-Path $TOOLS "dotnet-sdk-$DOTNET_VERSION-win-x64.zip"
+$DOTNET_DIR = Join-Path $TOOLS "dotnet-sdk-$DOTNET_VERSION-win-x64"
+if (-not (Test-Path (Join-Path $DOTNET_DIR "dotnet.exe"))) {
+    Write-Host "[dotnet] Preparing .NET SDK v$DOTNET_VERSION..." -ForegroundColor Yellow
+    Require-ToolFile -Path $DOTNET_ZIP -Description ".NET SDK archive"
+    if (-not (Test-Path $DOTNET_DIR)) { New-Item -ItemType Directory -Path $DOTNET_DIR | Out-Null }
+    Expand-Archive -Path $DOTNET_ZIP -DestinationPath $DOTNET_DIR -Force
+    Write-Host "  Done." -ForegroundColor Green
+} else {
+    Write-Host "[dotnet] .NET SDK v$DOTNET_VERSION cached." -ForegroundColor Green
+}
+
+$DOTNET_EXE = Join-Path $DOTNET_DIR "dotnet.exe"
+
 Write-Host ""
 Write-Host "Building application services..." -ForegroundColor Cyan
 
@@ -256,6 +310,7 @@ $HS_DIR = Join-Path $PROJECT_ROOT "height-server"
 $MP_DIR = Join-Path $PROJECT_ROOT "map-provider"
 $UI_DIR = Join-Path $PROJECT_ROOT "map-provider-ui"
 $MM_DIR = Join-Path $PROJECT_ROOT "map-manager"
+$MTD_DIR = Join-Path $PROJECT_ROOT "mongo-transaction-demo"
 
 Write-Host "  Resolving Pixi env for height-server..." -ForegroundColor Yellow
 Push-Location $HS_DIR
@@ -289,12 +344,26 @@ Invoke-Step -Description "npm run build (map-manager)" -Command { & $NPM_CMD run
 Pop-Location
 Write-Host "    Done." -ForegroundColor Green
 
+$MTD_PUBLISH_DIR = Join-Path $MTD_DIR "bin\Release\net8.0\publish"
+$MTD_NUGET_CONFIG = Join-Path $MTD_DIR "NuGet.Config"
+Write-Host "  Publishing mongo-transaction-demo..." -ForegroundColor Yellow
+Push-Location $MTD_DIR
+Invoke-WithDotnetEnv -Command {
+    Invoke-Step -Description "dotnet restore (mongo-transaction-demo)" -Command { & $DOTNET_EXE restore --configfile $MTD_NUGET_CONFIG }
+    Invoke-Step -Description "dotnet publish (mongo-transaction-demo)" -Command { & $DOTNET_EXE publish --no-restore -c Release -o $MTD_PUBLISH_DIR }
+}
+Pop-Location
+Write-Host "    Done." -ForegroundColor Green
+
 Write-Host ""
 Write-Host "Assembling deploy_package..." -ForegroundColor Cyan
 
 $pkgNode = Join-Path $PKG "node"
 New-Item -ItemType Directory -Path $pkgNode | Out-Null
 Copy-Item (Join-Path $NODE_DIR "node.exe") $pkgNode
+$pkgDotnet = Join-Path $PKG "dotnet"
+New-Item -ItemType Directory -Path $pkgDotnet | Out-Null
+Copy-Item -Recurse (Join-Path $DOTNET_DIR "*") $pkgDotnet
 
 Copy-Item -Recurse $NGINX_DIR (Join-Path $PKG "nginx")
 $pkgMongo = Join-Path $PKG "mongodb"
@@ -341,6 +410,11 @@ Write-Host "  Copying map-provider-ui..." -ForegroundColor Yellow
 $uiDest = Join-Path $svcDir "map-provider-ui"
 New-Item -ItemType Directory -Path $uiDest | Out-Null
 Copy-Item -Recurse (Join-Path $UI_DIR "dist") (Join-Path $uiDest "dist")
+
+Write-Host "  Copying mongo-transaction-demo publish output..." -ForegroundColor Yellow
+$mtdDest = Join-Path $svcDir "mongo-transaction-demo"
+New-Item -ItemType Directory -Path $mtdDest | Out-Null
+Copy-Item -Recurse (Join-Path $MTD_PUBLISH_DIR "*") $mtdDest
 
 Copy-Item (Join-Path $SCRIPT_DIR "GhostOrchestrator.ps1") $PKG
 Copy-Item (Join-Path $SCRIPT_DIR "RunPackage.ps1") $PKG

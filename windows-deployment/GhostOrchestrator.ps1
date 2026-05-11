@@ -135,6 +135,16 @@ function Start-ManifestService {
             $args = "`"$entry`""
             return Start-ServiceProcess -Name $Name -Exe $NODE -Arguments $args -WorkDir $workDir -EnvVars $envHash
         }
+        "dotnet" {
+            $workDir = Join-Path $BASE $Cfg.working_dir
+            $entry = Join-Path $workDir $Cfg.entry
+            $exe = Join-Path $BASE $Cfg.runtime_exe
+            $envHash["DOTNET_ROOT"] = Split-Path $exe -Parent
+            $envHash["DOTNET_MULTILEVEL_LOOKUP"] = "0"
+            $envHash["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
+            $args = "`"$entry`""
+            return Start-ServiceProcess -Name $Name -Exe $exe -Arguments $args -WorkDir $workDir -EnvVars $envHash
+        }
         default {
             Write-Warning "Unknown service type '$($Cfg.type)' for $Name - skipping."
             return $null

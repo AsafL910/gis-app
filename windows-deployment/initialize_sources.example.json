@@ -63,6 +63,14 @@
       },
       "target_path": "windows-deployment/tools/WinSW-x64.exe"
     },
+    "dotnet-sdk-zip": {
+      "source": {
+        "type": "artifact",
+        "url": "https://artifactory.example.com/generic/tools/dotnet-sdk-8.0.420-win-x64.zip",
+        "unpack": false
+      },
+      "target_path": "windows-deployment/tools/dotnet-sdk-8.0.420-win-x64.zip"
+    },
     "mongodb-runtime-zip": {
       "source": {
         "type": "artifact",

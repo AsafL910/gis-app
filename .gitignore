@@ -33,6 +33,8 @@ env/
 node_modules/
 dist/
 .vite/
+bin/
+obj/
 
 # Pixi / Conda / local envs
 .pixi/
@@ -54,7 +56,11 @@ windows-deployment/tools/nginx-*/
 windows-deployment/tools/node-v*-win-x64/
 windows-deployment/tools/mongodb-win32-x86_64-windows-*/
 windows-deployment/tools/mongosh-*/
+windows-deployment/tools/dotnet-sdk-*-win-x64/
 windows-deployment/deploy_package/
+windows-deployment/.dotnet-cli/
+windows-deployment/.nuget-packages/
+windows-deployment/.appdata/
 
 # Generated geodata / archives
 *.vrt

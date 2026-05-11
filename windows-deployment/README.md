@@ -20,6 +20,7 @@ Windows SCM
   -> GlbDemoService (WinSW)
     -> GhostOrchestrator.ps1
       -> mongod.exe             mongo-db (single-node replica set)
+      -> dotnet.exe             mongo-transaction-demo
       -> nginx.exe              data-http
       -> nginx.exe              map-provider-ui
       -> .pixi Python           height-server
@@ -39,6 +40,8 @@ deploy_package/
   install.ps1
   node/
     node.exe
+  dotnet/
+    dotnet.exe
   mongodb/
     bin/
       mongod.exe
@@ -62,6 +65,8 @@ deploy_package/
       dist/
       node_modules/
       package.json
+    mongo-transaction-demo/
+      MongoTransactionDemo.dll
     map-provider-ui/
       dist/
   data/
@@ -96,17 +101,22 @@ By default it does not overwrite existing content. If you want it to replace an 
 - Node.js portable zip
 - Nginx portable zip
 - `WinSW-x64.exe`
+- .NET SDK portable zip
 - MongoDB portable zip
 - mongosh portable zip
 
 After initialization, the build script will:
 
 - use bundled portable Node.js, Nginx, and WinSW inputs
+- use bundled portable .NET SDK input for build and runtime
 - use bundled portable MongoDB and mongosh inputs
 - run `pixi install` in `height-server` and `map-provider`
 - run runtime smoke checks for the bundled Python environments before packaging
 - build the frontend and map-manager
+- publish the example .NET 8 Mongo transaction worker
 - assemble `deploy_package/`
+
+The `.NET` example uses a project-local `NuGet.Config`. Point it at `nuget.org` or your Artifactory NuGet mirror depending on how your build environment is allowed to restore packages.
 
 ## Install
 
@@ -132,6 +142,7 @@ This runs `GhostOrchestrator.ps1` in the foreground and is the recommended first
 
 - The Python executables used at runtime are the service-local Pixi interpreters referenced in `deployment_manifest.json`.
 - MongoDB is bundled as a portable runtime and started by the orchestrator with `--replSet` so future services can rely on replica-set-only features such as transactions or change streams.
+- `mongo-transaction-demo` is a bundled .NET 8 example that retries until MongoDB is ready and then commits a document inside a transaction.
 - For this packaging model, MongoDB does not need an MSI installer. The portable zip plus `mongosh` is enough.
 - If you update Python dependencies, rebuild the package so the copied `.pixi` environments stay in sync.
 - WinSW is bundled into `deploy_package` as `GlbDemoService.exe`, so the target machine does not need separate access to WinSW.

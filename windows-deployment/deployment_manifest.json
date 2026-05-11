@@ -13,6 +13,19 @@
       "log_path": "logs\\mongodb\\mongod.log",
       "shell_exe": "mongosh\\bin\\mongosh.exe"
     },
+    "mongo-transaction-demo": {
+      "type": "dotnet",
+      "working_dir": "services\\mongo-transaction-demo",
+      "runtime_exe": "dotnet\\dotnet.exe",
+      "entry": "MongoTransactionDemo.dll",
+      "env": {
+        "SERVICE_NAME": "mongo-transaction-demo",
+        "MONGO_CONNECTION_STRING": "mongodb://127.0.0.1:27017/?replicaSet=glb-rs0",
+        "MONGO_DATABASE": "glb_demo",
+        "MONGO_COLLECTION": "transaction_demo",
+        "TRANSACTION_RETRY_SECONDS": "5"
+      }
+    },
     "data-http": {
       "type": "nginx",
       "port": 8011,

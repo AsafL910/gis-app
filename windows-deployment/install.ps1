@@ -33,20 +33,215 @@ function Stop-InstallProcesses {
         [string]$RootPath
     )
 
+    if (-not (Test-Path $RootPath)) {
+        return
+    }
+
     $normalizedRoot = $RootPath.ToLowerInvariant()
     $processes = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue
     foreach ($proc in $processes) {
         $exePath = $proc.ExecutablePath
-        if ([string]::IsNullOrWhiteSpace($exePath)) {
+        $commandLine = $proc.CommandLine
+        $matchesRoot = $false
+
+        if (-not [string]::IsNullOrWhiteSpace($exePath) -and $exePath.ToLowerInvariant().StartsWith($normalizedRoot)) {
+            $matchesRoot = $true
+        }
+
+        if (-not $matchesRoot -and -not [string]::IsNullOrWhiteSpace($commandLine) -and $commandLine.ToLowerInvariant().Contains($normalizedRoot)) {
+            $matchesRoot = $true
+        }
+
+        if (-not $matchesRoot) {
             continue
         }
 
-        if ($exePath.ToLowerInvariant().StartsWith($normalizedRoot)) {
-            try {
-                Stop-Process -Id $proc.ProcessId -Force -ErrorAction Stop
-            } catch {
-            }
+        try {
+            Stop-Process -Id $proc.ProcessId -Force -ErrorAction Stop
+            Write-Host "  Stopped process $($proc.Name) (PID $($proc.ProcessId)) using $RootPath" -ForegroundColor DarkYellow
+        } catch {
         }
+    }
+}
+
+function Get-DescendantProcessIds {
+    param(
+        [int]$RootProcessId
+    )
+
+    $allProcesses = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+    if ($allProcesses.Count -eq 0) {
+        return @()
+    }
+
+    $childrenByParent = @{}
+    foreach ($proc in $allProcesses) {
+        $parentId = [int]$proc.ParentProcessId
+        if (-not $childrenByParent.ContainsKey($parentId)) {
+            $childrenByParent[$parentId] = New-Object System.Collections.Generic.List[int]
+        }
+        $childrenByParent[$parentId].Add([int]$proc.ProcessId) | Out-Null
+    }
+
+    $result = New-Object System.Collections.Generic.List[int]
+    $queue = New-Object System.Collections.Generic.Queue[int]
+    $queue.Enqueue($RootProcessId)
+
+    while ($queue.Count -gt 0) {
+        $current = $queue.Dequeue()
+        if (-not $childrenByParent.ContainsKey($current)) {
+            continue
+        }
+
+        foreach ($childId in $childrenByParent[$current]) {
+            $result.Add($childId) | Out-Null
+            $queue.Enqueue($childId)
+        }
+    }
+
+    return @($result | Select-Object -Unique)
+}
+
+function Stop-ProcessTree {
+    param(
+        [int]$RootProcessId
+    )
+
+    $descendants = @(Get-DescendantProcessIds -RootProcessId $RootProcessId)
+    foreach ($pid in ($descendants | Sort-Object -Descending)) {
+        try {
+            Stop-Process -Id $pid -Force -ErrorAction Stop
+            Write-Host "  Stopped child process PID $pid" -ForegroundColor DarkYellow
+        } catch {
+        }
+    }
+
+    try {
+        Stop-Process -Id $RootProcessId -Force -ErrorAction Stop
+        Write-Host "  Stopped root process PID $RootProcessId" -ForegroundColor DarkYellow
+    } catch {
+    }
+}
+
+function Wait-ForServiceStopped {
+    param(
+        [string]$Name,
+        [int]$TimeoutSeconds = 20
+    )
+
+    $service = Get-Service -Name $Name -ErrorAction SilentlyContinue
+    if (-not $service) {
+        return
+    }
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $service.Refresh()
+        if ($service.Status -eq "Stopped") {
+            return
+        }
+
+        Start-Sleep -Milliseconds 500
+    }
+}
+
+function Get-ServiceProcessId {
+    param(
+        [string]$Name
+    )
+
+    try {
+        $svc = Get-CimInstance Win32_Service -Filter "Name='$Name'" -ErrorAction Stop
+        return [int]$svc.ProcessId
+    } catch {
+        return 0
+    }
+}
+
+function Wait-ForPathReleased {
+    param(
+        [string]$Path,
+        [int]$TimeoutSeconds = 20
+    )
+
+    if (-not (Test-Path $Path)) {
+        return
+    }
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $item = Get-Item -LiteralPath $Path -ErrorAction Stop
+            if (-not $item.PSIsContainer) {
+                $stream = [System.IO.File]::Open($item.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+                $stream.Dispose()
+                return
+            }
+
+            $probeFile = Get-ChildItem -LiteralPath $item.FullName -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $probeFile) {
+                return
+            }
+
+            $stream = [System.IO.File]::Open($probeFile.FullName, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+            $stream.Dispose()
+            return
+        } catch {
+            Start-Sleep -Milliseconds 500
+        }
+    }
+
+    throw "Timed out waiting for file handles under '$Path' to be released."
+}
+
+function Remove-InstallContents {
+    param(
+        [string]$InstallDir
+    )
+
+    if (-not (Test-Path $InstallDir)) {
+        return
+    }
+
+    $items = @(Get-ChildItem -LiteralPath $InstallDir -Force | Where-Object { $_.Name -ne "data" })
+    foreach ($item in $items) {
+        Remove-Item -LiteralPath $item.FullName -Recurse -Force -ErrorAction Stop
+    }
+}
+
+function Stop-InstalledServiceAndChildren {
+    param(
+        [string]$ServiceName,
+        [string]$InstallDir
+    )
+
+    $serviceProcessId = Get-ServiceProcessId -Name $ServiceName
+    try { Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue } catch {}
+    Wait-ForServiceStopped -Name $ServiceName
+
+    if ($serviceProcessId -gt 0) {
+        Stop-ProcessTree -RootProcessId $serviceProcessId
+    }
+
+    $winsw = Join-Path $InstallDir "$ServiceName.exe"
+    if (Test-Path $winsw) {
+        try { & $winsw stop | Out-Null } catch {}
+    }
+
+    Stop-InstallProcesses -RootPath $InstallDir
+    Start-Sleep -Seconds 2
+    Wait-ForPathReleased -Path $InstallDir
+}
+
+function Unregister-InstalledService {
+    param(
+        [string]$ServiceName,
+        [string]$InstallDir
+    )
+
+    $winsw = Join-Path $InstallDir "$ServiceName.exe"
+    if (Test-Path $winsw) {
+        try { & $winsw uninstall } catch {}
     }
 }
 
@@ -235,18 +430,10 @@ if (-not $isAdmin) {
 if ($Uninstall) {
     Write-Host "Uninstalling $SERVICE_NAME..." -ForegroundColor Yellow
 
-    $winsw = Join-Path $INSTALL_DIR "$SERVICE_NAME.exe"
-    if (Test-Path $winsw) {
-        # Stop the service first (ignore errors if not running)
-        try { Stop-Service -Name $SERVICE_NAME -Force -ErrorAction SilentlyContinue } catch {}
-        Start-Sleep -Seconds 2
-        & $winsw uninstall
-        Write-Host "Service unregistered." -ForegroundColor Green
-    }
-
     if (Test-Path $INSTALL_DIR) {
-        Stop-InstallProcesses -RootPath $INSTALL_DIR
-        Start-Sleep -Seconds 1
+        Stop-InstalledServiceAndChildren -ServiceName $SERVICE_NAME -InstallDir $INSTALL_DIR
+        Unregister-InstalledService -ServiceName $SERVICE_NAME -InstallDir $INSTALL_DIR
+        Write-Host "Service unregistered." -ForegroundColor Green
     }
 
     if (Test-Path $INSTALL_DIR) {
@@ -275,17 +462,8 @@ Write-Host ""
 Write-Host "[1/4] Copying files to $INSTALL_DIR..." -ForegroundColor Yellow
 
 if (Test-Path $INSTALL_DIR) {
-    # If service exists, stop it first
-    try { Stop-Service -Name $SERVICE_NAME -Force -ErrorAction SilentlyContinue } catch {}
-    Start-Sleep -Seconds 2
-
-    $winsw = Join-Path $INSTALL_DIR "$SERVICE_NAME.exe"
-    if (Test-Path $winsw) {
-        try { & $winsw stop | Out-Null } catch {}
-    }
-
-    Stop-InstallProcesses -RootPath $INSTALL_DIR
-    Start-Sleep -Seconds 1
+    Stop-InstalledServiceAndChildren -ServiceName $SERVICE_NAME -InstallDir $INSTALL_DIR
+    Remove-InstallContents -InstallDir $INSTALL_DIR
 }
 
 # Create install dir and copy everything
