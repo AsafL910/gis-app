@@ -1,0 +1,50 @@
+{
+  "version": "1.0.0",
+
+  "_comment": "Each Python service carries its own Pixi env (includes Python + GDAL + all deps). No shared Python runtime.",
+
+  "services": {
+    "data-http": {
+      "type": "nginx",
+      "port": 8011,
+      "nginx_conf": "nginx-data.conf"
+    },
+    "map-provider-ui": {
+      "type": "nginx",
+      "port": 8013,
+      "nginx_conf": "nginx-ui.conf"
+    },
+    "height-server": {
+      "type": "python",
+      "port": 8009,
+      "internal_port": 8001,
+      "module": "src.app:app",
+      "working_dir": "services\\height-server",
+      "python_exe": "services\\height-server\\.pixi\\envs\\default\\python.exe",
+      "env": {
+        "ELEV_FILENAME": "dtm\\israel_merged.vrt",
+        "TOP_ELEV_FILENAME": "israel_top_cog.tif",
+        "BOTTOM_ELEV_FILENAME": "israel_bottom_cog.tif"
+      }
+    },
+    "map-provider": {
+      "type": "python",
+      "port": 8010,
+      "internal_port": 8000,
+      "module": "src.main:app",
+      "working_dir": "services\\map-provider",
+      "python_exe": "services\\map-provider\\.pixi\\envs\\default\\python.exe",
+      "env": {}
+    },
+    "map-manager": {
+      "type": "node",
+      "port": 8008,
+      "internal_port": 8002,
+      "entry": "dist\\index.js",
+      "working_dir": "services\\map-manager",
+      "env": {
+        "PORT": "8002"
+      }
+    }
+  }
+}

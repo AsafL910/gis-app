@@ -1,0 +1,29 @@
+<service>
+  <!-- ============================================================
+       WinSW config — the ONLY thing Windows Service Manager sees.
+       WinSW docs: https://github.com/winsw/winsw
+       ============================================================ -->
+
+  <id>GlbDemoService</id>
+  <name>GLB Demo Service</name>
+  <description>Runs all GLB Demo micro-services (Nginx, Python, Node) via the Ghost Orchestrator.</description>
+
+  <!-- Launch the orchestrator script -->
+  <executable>powershell.exe</executable>
+  <arguments>-ExecutionPolicy Bypass -NoProfile -File "%BASE%\GhostOrchestrator.ps1"</arguments>
+
+  <!-- Working directory = wherever GlbDemoService.exe lives -->
+  <workingdirectory>%BASE%</workingdirectory>
+
+  <!-- Rolling log files so they don't grow forever -->
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+
+  <!-- If the orchestrator crashes, wait 10 s then restart it -->
+  <onfailure action="restart" delay="10 sec"/>
+
+  <!-- Start automatically on boot -->
+  <startmode>Automatic</startmode>
+</service>

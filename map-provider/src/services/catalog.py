@@ -22,7 +22,9 @@ def get_tif_url(relative_path: str) -> str:
     path = (DATA_DIR / relative_path).resolve()
     if not str(path).startswith(str(DATA_DIR.resolve())) or not path.exists():
         raise HTTPException(status_code=404, detail=f"File {relative_path} not found")
-    return "file:///" + str(path).replace("\\", "/")
+    # TiTiler/Rasterio on Windows handles direct filesystem paths more reliably
+    # than file:/// URLs with drive letters and spaces.
+    return str(path)
 
 
 def list_layers_payload() -> dict:

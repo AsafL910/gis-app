@@ -32,7 +32,7 @@ export async function listFiles(directory: string, suffixes: Set<string>): Promi
     rows.push({
       name: path.basename(filePath),
       path: relativeToData(filePath),
-      size: stat.size
+      size: Number(stat.size)
     });
   });
   rows.sort((a, b) => a.path.localeCompare(b.path));

@@ -32,7 +32,7 @@ services:
       ELEV_FILENAME: dtm/israel_merged.vrt
       TOP_ELEV_FILENAME: israel_top_cog.tif
       BOTTOM_ELEV_FILENAME: israel_bottom_cog.tif
-    command: uvicorn src.app:app --host 0.0.0.0 --port 8001 --reload
+    command: pixi run start
 
   map-manager:
     build: ./map-manager
@@ -56,4 +56,4 @@ services:
       - ./data:/data                  # same shared data volume (read-only for now)
     environment:
       DATA_DIR: /data
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    command: pixi run start

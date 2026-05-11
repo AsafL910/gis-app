@@ -1,22 +1,23 @@
 [workspace]
 authors = ["Asaf Lumer <asaflumer@gmail.com>"]
 channels = [
-    "conda-forge",
     "https://repo.anaconda.com/pkgs/main",
     "https://repo.anaconda.com/pkgs/r",
     "https://repo.anaconda.com/pkgs/msys2",
+    "conda-forge",
 ]
 name = "height-server"
-platforms = ["win-64"]
+platforms = ["win-64", "linux-64"]
 version = "0.1.0"
 
 [tasks]
 start = "uvicorn src.app:app --reload --host 0.0.0.0 --port 8001"
 
 [dependencies]
-python = "==3.12"
-fastapi = "*"
-gdal = "*"
-uvicorn = "*"
+python = "==3.12.3"
+fastapi = "==0.112.2"
+gdal = "==3.6.2"
+uvicorn = "==0.32.1"
 pip = "*"
-pyproj = "*"
+pyproj = "<3.7"
+numpy = "<2"

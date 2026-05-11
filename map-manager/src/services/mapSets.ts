@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import path from "node:path";
 import { DATA_DIR, DTM_DIR, MAPSETS_DIR, RASTER_DIR } from "../config.js";
 import type { MapSetCreateRequest, MapSetManifest } from "../types.js";
 import {
