@@ -49,6 +49,13 @@ scratch/
 .env.*
 docker-compose.override.yml
 
+# Windows deployment unpacked tools
+windows-deployment/tools/nginx-*/
+windows-deployment/tools/node-v*-win-x64/
+windows-deployment/tools/mongodb-win32-x86_64-windows-*/
+windows-deployment/tools/mongosh-*/
+windows-deployment/deploy_package/
+
 # Generated geodata / archives
 *.vrt
 *.aux.xml

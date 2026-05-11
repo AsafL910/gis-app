@@ -4,6 +4,15 @@
   "_comment": "Each Python service carries its own Pixi env (includes Python + GDAL + all deps). No shared Python runtime.",
 
   "services": {
+    "mongo-db": {
+      "type": "mongo",
+      "port": 27017,
+      "bind_ip": "127.0.0.1",
+      "repl_set": "glb-rs0",
+      "db_path": "data\\mongodb\\db",
+      "log_path": "logs\\mongodb\\mongod.log",
+      "shell_exe": "mongosh\\bin\\mongosh.exe"
+    },
     "data-http": {
       "type": "nginx",
       "port": 8011,

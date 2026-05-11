@@ -1,0 +1,106 @@
+{
+  "$schema_version": "1.0",
+  "release_name": "example-offline-stack",
+  "description": "Generic initialization manifest for preparing service repos, runtime tools, and packaged environments before build_package.ps1 runs.",
+  "defaults": {
+    "git_ref": "main",
+    "overwrite_existing": false
+  },
+  "entries": {
+    "map-provider-ui": {
+      "source": {
+        "type": "git",
+        "url": "https://example.com/org/map-provider-ui.git",
+        "ref": "release/0.2"
+      },
+      "target_path": "map-provider-ui"
+    },
+    "map-manager": {
+      "source": {
+        "type": "git",
+        "url": "https://example.com/org/map-manager.git",
+        "ref": "release/0.2"
+      },
+      "target_path": "map-manager"
+    },
+    "map-provider": {
+      "source": {
+        "type": "git",
+        "url": "https://example.com/org/map-provider.git",
+        "ref": "release/0.2"
+      },
+      "target_path": "map-provider"
+    },
+    "height-server": {
+      "source": {
+        "type": "git",
+        "url": "https://example.com/org/height-server.git",
+        "ref": "release/0.2"
+      },
+      "target_path": "height-server"
+    },
+    "node-runtime-zip": {
+      "source": {
+        "type": "artifact",
+        "url": "https://artifactory.example.com/generic/tools/node-v20.18.1-win-x64.zip",
+        "unpack": false
+      },
+      "target_path": "windows-deployment/tools/node-v20.18.1-win-x64.zip"
+    },
+    "nginx-runtime-zip": {
+      "source": {
+        "type": "artifact",
+        "url": "https://artifactory.example.com/generic/tools/nginx-1.30.0.zip",
+        "unpack": false
+      },
+      "target_path": "windows-deployment/tools/nginx-1.30.0.zip"
+    },
+    "winsw-exe": {
+      "source": {
+        "type": "artifact",
+        "url": "https://artifactory.example.com/generic/tools/WinSW-x64.exe",
+        "unpack": false
+      },
+      "target_path": "windows-deployment/tools/WinSW-x64.exe"
+    },
+    "mongodb-runtime-zip": {
+      "source": {
+        "type": "artifact",
+        "url": "https://artifactory.example.com/generic/tools/mongodb-windows-x86_64-8.3.1.zip",
+        "unpack": false
+      },
+      "target_path": "windows-deployment/tools/mongodb-windows-x86_64-8.3.1.zip"
+    },
+    "mongosh-runtime-zip": {
+      "source": {
+        "type": "artifact",
+        "url": "https://artifactory.example.com/generic/tools/mongosh-2.8.3-win32-x64.zip",
+        "unpack": false
+      },
+      "target_path": "windows-deployment/tools/mongosh-2.8.3-win32-x64.zip"
+    },
+    "map-provider-pixi-env": {
+      "source": {
+        "type": "artifact",
+        "url": "https://artifactory.example.com/generic/envs/map-provider-pixi.zip",
+        "unpack": true
+      },
+      "target_path": "map-provider/.pixi"
+    },
+    "height-server-pixi-env": {
+      "source": {
+        "type": "artifact",
+        "url": "https://artifactory.example.com/generic/envs/height-server-pixi.zip",
+        "unpack": true
+      },
+      "target_path": "height-server/.pixi"
+    },
+    "shared-data": {
+      "source": {
+        "type": "local",
+        "path": "C:\\release-inputs\\glb-demo\\data"
+      },
+      "target_path": "data"
+    }
+  }
+}

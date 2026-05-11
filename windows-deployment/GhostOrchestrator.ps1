@@ -6,6 +6,7 @@ $DATA_DIR = Join-Path $BASE "data"
 $NGINX_DIR = Join-Path $BASE "nginx"
 $NODE = Join-Path (Join-Path $BASE "node") "node.exe"
 $LOG_DIR = Join-Path $BASE "logs"
+$MONGO_DIR = Join-Path $BASE "mongodb"
 
 if (-not (Test-Path $LOG_DIR)) { New-Item -ItemType Directory -Path $LOG_DIR | Out-Null }
 
@@ -78,6 +79,16 @@ function Start-ManifestService {
     }
 
     switch ($Cfg.type) {
+        "mongo" {
+            $exe = Join-Path (Join-Path $MONGO_DIR "bin") "mongod.exe"
+            $dbPath = Join-Path $BASE $Cfg.db_path
+            $logPath = Join-Path $BASE $Cfg.log_path
+            $logDir = Split-Path $logPath -Parent
+            if (-not (Test-Path $dbPath)) { New-Item -ItemType Directory -Path $dbPath -Force | Out-Null }
+            if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
+            $args = "--port $($Cfg.port) --bind_ip $($Cfg.bind_ip) --replSet $($Cfg.repl_set) --dbpath `"$dbPath`" --logpath `"$logPath`" --logappend"
+            return Start-ServiceProcess -Name $Name -Exe $exe -Arguments $args -WorkDir $BASE -EnvVars $envHash
+        }
         "nginx" {
             $exe = Join-Path $NGINX_DIR "nginx.exe"
             $args = "-c conf\$($Cfg.nginx_conf)"
@@ -131,10 +142,90 @@ function Start-ManifestService {
     }
 }
 
+function Wait-ForTcpPort {
+    param(
+        [string]$Host,
+        [int]$Port,
+        [int]$TimeoutSeconds = 30
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $client = New-Object System.Net.Sockets.TcpClient
+        try {
+            $async = $client.BeginConnect($Host, $Port, $null, $null)
+            if ($async.AsyncWaitHandle.WaitOne(1000) -and $client.Connected) {
+                $client.EndConnect($async)
+                return $true
+            }
+        } catch {
+        } finally {
+            $client.Dispose()
+        }
+
+        Start-Sleep -Milliseconds 500
+    }
+
+    return $false
+}
+
+function Ensure-MongoReplicaSet {
+    param(
+        [string]$Name,
+        [object]$Cfg
+    )
+
+    $shellPath = Join-Path $BASE $Cfg.shell_exe
+    if (-not (Test-Path $shellPath)) {
+        Write-Warning "Mongo shell not found at '$shellPath'. Replica set initialization skipped for $Name."
+        return
+    }
+
+    if (-not (Wait-ForTcpPort -Host $Cfg.bind_ip -Port ([int]$Cfg.port) -TimeoutSeconds 30)) {
+        Write-Warning "MongoDB did not become ready on $($Cfg.bind_ip):$($Cfg.port). Replica set initialization skipped."
+        return
+    }
+
+    $memberHost = "$($Cfg.bind_ip):$($Cfg.port)"
+    $js = @"
+try {
+  rs.status();
+  print('Replica set already initialized');
+} catch (err) {
+  if ((err.codeName && err.codeName === 'NotYetInitialized') || /not yet initialized|no replset config/i.test(err.message || '')) {
+    rs.initiate({
+      _id: '$($Cfg.repl_set)',
+      members: [{ _id: 0, host: '$memberHost' }]
+    });
+    print('Replica set initialized');
+  } else {
+    throw err;
+  }
+}
+"@
+
+    $stdoutLog = Join-Path $LOG_DIR "$Name.init.out.log"
+    $stderrLog = Join-Path $LOG_DIR "$Name.init.err.log"
+    Add-Content -Path $stdoutLog -Value "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Checking replica set state"
+
+    & $shellPath --quiet --host $Cfg.bind_ip --port $Cfg.port --eval $js 1>> $stdoutLog 2>> $stderrLog
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Replica set initialization command for $Name exited with code $LASTEXITCODE. Check $stderrLog."
+    } else {
+        Write-Host "[OK]  $Name replica set ready"
+    }
+}
+
 $children = @{}
 foreach ($prop in $manifest.services.PSObject.Properties) {
     $proc = Start-ManifestService -Name $prop.Name -Cfg $prop.Value
     if ($proc) { $children[$prop.Name] = $proc }
+}
+
+foreach ($prop in $manifest.services.PSObject.Properties) {
+    if ($prop.Value.type -eq "mongo" -and $children.ContainsKey($prop.Name)) {
+        Ensure-MongoReplicaSet -Name $prop.Name -Cfg $prop.Value
+    }
 }
 
 Write-Host "`nAll services launched. Entering monitor loop...`n"
@@ -147,8 +238,14 @@ try {
             $proc = $children[$name]
             if ($proc.HasExited) {
                 Write-Warning "$name (PID $($proc.Id)) exited with code $($proc.ExitCode). Restarting..."
-                $restartProc = Start-ManifestService -Name $name -Cfg $manifest.services.$name
-                if ($restartProc) { $children[$name] = $restartProc }
+                $cfg = $manifest.services.PSObject.Properties[$name].Value
+                $restartProc = Start-ManifestService -Name $name -Cfg $cfg
+                if ($restartProc) {
+                    $children[$name] = $restartProc
+                    if ($cfg.type -eq "mongo") {
+                        Ensure-MongoReplicaSet -Name $name -Cfg $cfg
+                    }
+                }
             }
         }
     }

@@ -5,7 +5,7 @@ $orchestrator = Join-Path $BASE "GhostOrchestrator.ps1"
 $uiUrl = "http://localhost:8013"
 $logsDir = Join-Path $BASE "logs"
 $serviceName = "GlbDemoService"
-$requiredPorts = @(8000, 8001, 8002, 8011, 8013)
+$requiredPorts = @(8000, 8001, 8002, 8011, 8013, 27017)
 
 function Patch-NginxConfigsForLocalRun {
     param(

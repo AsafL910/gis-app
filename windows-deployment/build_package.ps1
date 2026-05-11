@@ -225,6 +225,30 @@ if (-not (Test-Path $WINSW_EXE)) {
     Write-Host "[3/3] WinSW v$WINSW_VERSION cached." -ForegroundColor Green
 }
 
+$MONGODB_VERSION = "8.3.1"
+$MONGODB_ZIP = Join-Path $TOOLS "mongodb-windows-x86_64-$MONGODB_VERSION.zip"
+$MONGODB_DIR = Join-Path $TOOLS "mongodb-win32-x86_64-windows-$MONGODB_VERSION"
+if (-not (Test-Path $MONGODB_DIR)) {
+    Write-Host "[mongo] Preparing MongoDB v$MONGODB_VERSION..." -ForegroundColor Yellow
+    Require-ToolFile -Path $MONGODB_ZIP -Description "MongoDB portable archive"
+    Expand-Archive -Path $MONGODB_ZIP -DestinationPath $TOOLS -Force
+    Write-Host "  Done." -ForegroundColor Green
+} else {
+    Write-Host "[mongo] MongoDB v$MONGODB_VERSION cached." -ForegroundColor Green
+}
+
+$MONGOSH_VERSION = "2.8.3"
+$MONGOSH_ZIP = Join-Path $TOOLS "mongosh-$MONGOSH_VERSION-win32-x64.zip"
+$MONGOSH_DIR = Join-Path $TOOLS "mongosh-$MONGOSH_VERSION-win32-x64"
+if (-not (Test-Path $MONGOSH_DIR)) {
+    Write-Host "[mongo] Preparing mongosh v$MONGOSH_VERSION..." -ForegroundColor Yellow
+    Require-ToolFile -Path $MONGOSH_ZIP -Description "mongosh portable archive"
+    Expand-Archive -Path $MONGOSH_ZIP -DestinationPath $TOOLS -Force
+    Write-Host "  Done." -ForegroundColor Green
+} else {
+    Write-Host "[mongo] mongosh v$MONGOSH_VERSION cached." -ForegroundColor Green
+}
+
 Write-Host ""
 Write-Host "Building application services..." -ForegroundColor Cyan
 
@@ -273,6 +297,12 @@ New-Item -ItemType Directory -Path $pkgNode | Out-Null
 Copy-Item (Join-Path $NODE_DIR "node.exe") $pkgNode
 
 Copy-Item -Recurse $NGINX_DIR (Join-Path $PKG "nginx")
+$pkgMongo = Join-Path $PKG "mongodb"
+$pkgMongoShell = Join-Path $PKG "mongosh"
+New-Item -ItemType Directory -Path $pkgMongo | Out-Null
+New-Item -ItemType Directory -Path $pkgMongoShell | Out-Null
+Copy-Item -Recurse (Join-Path $MONGODB_DIR "*") $pkgMongo
+Copy-Item -Recurse (Join-Path $MONGOSH_DIR "*") $pkgMongoShell
 
 $nginxConf = Join-Path (Join-Path $PKG "nginx") "conf"
 if (-not (Test-Path $nginxConf)) { New-Item -ItemType Directory -Path $nginxConf | Out-Null }
@@ -320,6 +350,8 @@ Copy-Item $WINSW_EXE (Join-Path $PKG "GlbDemoService.exe")
 Copy-Item (Join-Path $SCRIPT_DIR "install.ps1") $PKG
 
 New-Item -ItemType Directory -Path (Join-Path $PKG "data") | Out-Null
+New-Item -ItemType Directory -Path (Join-Path (Join-Path $PKG "data") "mongodb") | Out-Null
+New-Item -ItemType Directory -Path (Join-Path (Join-Path (Join-Path $PKG "data") "mongodb") "db") | Out-Null
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Green

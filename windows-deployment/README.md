@@ -19,6 +19,7 @@ No runtime `pip install` is needed on the target Windows machine.
 Windows SCM
   -> GlbDemoService (WinSW)
     -> GhostOrchestrator.ps1
+      -> mongod.exe             mongo-db (single-node replica set)
       -> nginx.exe              data-http
       -> nginx.exe              map-provider-ui
       -> .pixi Python           height-server
@@ -38,6 +39,12 @@ deploy_package/
   install.ps1
   node/
     node.exe
+  mongodb/
+    bin/
+      mongod.exe
+  mongosh/
+    bin/
+      mongosh.exe
   nginx/
     nginx.exe
     conf/
@@ -60,24 +67,42 @@ deploy_package/
   data/
 ```
 
-## Build
+## Initialize And Build
 
-Run this on a developer machine after pre-populating `windows-deployment/tools/`.
+Run this on a developer machine after preparing an initialization manifest.
 
 ```powershell
 cd gis-app\windows-deployment
+.\initialize_sources.ps1 -Manifest .\initialize_sources.example.json
 .\build_package.ps1
 ```
 
-The script does not download runtime tools anymore. You must place these files in `windows-deployment/tools/` first:
+The initializer is the setup step before packaging. It can:
+
+- clone service repos from git
+- download runtime tools from Artifactory or another artifact store
+- download MongoDB portable runtimes from Artifactory or another artifact store
+- unpack exported environments such as `.pixi`
+- copy local inputs such as shared data folders
+
+By default it does not overwrite existing content. If you want it to replace an existing repo, file, or folder, run it with:
+
+```powershell
+.\initialize_sources.ps1 -Manifest .\initialize_sources.example.json -OverwriteExisting
+```
+
+`build_package.ps1` still expects these runtime inputs to exist under `windows-deployment/tools/`:
 
 - Node.js portable zip
 - Nginx portable zip
 - `WinSW-x64.exe`
+- MongoDB portable zip
+- mongosh portable zip
 
-The build script will:
+After initialization, the build script will:
 
 - use bundled portable Node.js, Nginx, and WinSW inputs
+- use bundled portable MongoDB and mongosh inputs
 - run `pixi install` in `height-server` and `map-provider`
 - run runtime smoke checks for the bundled Python environments before packaging
 - build the frontend and map-manager
@@ -106,6 +131,8 @@ This runs `GhostOrchestrator.ps1` in the foreground and is the recommended first
 ## Notes
 
 - The Python executables used at runtime are the service-local Pixi interpreters referenced in `deployment_manifest.json`.
+- MongoDB is bundled as a portable runtime and started by the orchestrator with `--replSet` so future services can rely on replica-set-only features such as transactions or change streams.
+- For this packaging model, MongoDB does not need an MSI installer. The portable zip plus `mongosh` is enough.
 - If you update Python dependencies, rebuild the package so the copied `.pixi` environments stay in sync.
 - WinSW is bundled into `deploy_package` as `GlbDemoService.exe`, so the target machine does not need separate access to WinSW.
 - The same offline treatment applies to other portable runtime tools in the package, such as Node.js and Nginx.

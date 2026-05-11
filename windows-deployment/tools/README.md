@@ -9,6 +9,8 @@ Before running the build, place these files in this `tools/` folder:
 - `node-v20.18.1-win-x64.zip`
 - `nginx-1.30.0.zip`
 - `WinSW-x64.exe`
+- `mongodb-windows-x86_64-8.3.1.zip`
+- `mongosh-2.8.3-win32-x64.zip`
 
 ## Optional extracted folders
 
@@ -16,8 +18,12 @@ The build script will also accept these extracted folders if they already exist:
 
 - `node-v20.18.1-win-x64/`
 - `nginx-1.30.0/`
+- `mongodb-win32-x86_64-windows-8.3.1/`
+- `mongosh-2.8.3-win32-x64/`
 
 If an extracted folder exists, the corresponding zip is not needed.
+
+For MongoDB specifically, the downloaded zip is named `mongodb-windows-x86_64-8.3.1.zip`, but it extracts into `mongodb-win32-x86_64-windows-8.3.1/`.
 
 ## Typical flow
 
@@ -34,3 +40,4 @@ If an extracted folder exists, the corresponding zip is not needed.
 - These are build-time bundled inputs.
 - `deploy_package/` will include the runtime pieces needed on the target machine.
 - `WinSW-x64.exe` is copied into the package as `GlbDemoService.exe`.
+- MongoDB runs from the portable zip layout in the package; no MSI install is required for this deployment model.
