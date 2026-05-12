@@ -85,3 +85,5 @@ data/raster/*
 !data/raster/.gitkeep
 
 # If you want to keep specific small sample files, add them explicitly below.
+*.exe
+*.tsbuildinfo

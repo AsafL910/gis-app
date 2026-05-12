@@ -1,58 +1,17 @@
 $ErrorActionPreference = "Stop"
 
-$BASE = $PSScriptRoot
-$orchestrator = Join-Path $BASE "GhostOrchestrator.ps1"
-$uiUrl = "http://localhost:8013"
-$logsDir = Join-Path $BASE "logs"
-$serviceName = "GlbDemoService"
-$requiredPorts = @(8000, 8001, 8002, 8011, 8013, 27017)
+. (Join-Path $PSScriptRoot "scripts\lib\Layout.ps1")
+. (Join-Path $PSScriptRoot "scripts\lib\Common.ps1")
 
-function Patch-NginxConfigsForLocalRun {
-    param(
-        [string]$PackageDir
-    )
-
-    function Set-NginxRootDirective {
-        param(
-            [string]$ConfigPath,
-            [string]$ResolvedRoot
-        )
-
-        $normalizedRoot = $ResolvedRoot -replace '\\', '/'
-        $content = Get-Content $ConfigPath -Raw
-        $updated = [regex]::Replace(
-            $content,
-            '(?m)^(\s*root\s+)(?:"[^"]*"|[^;]+)(;)\s*$',
-            "`$1`"$normalizedRoot`"`$2",
-            1
-        )
-
-        if ($updated -eq $content) {
-            throw "Could not rewrite nginx root directive in $ConfigPath"
-        }
-
-        Set-Content $ConfigPath $updated
-    }
-
-    $dataDir = Join-Path $PackageDir "data"
-    $uiDistDir = Join-Path (Join-Path (Join-Path $PackageDir "services") "map-provider-ui") "dist"
-
-    $dataConf = Join-Path (Join-Path (Join-Path $PackageDir "nginx") "conf") "nginx-data.conf"
-    $uiConf = Join-Path (Join-Path (Join-Path $PackageDir "nginx") "conf") "nginx-ui.conf"
-
-    if (Test-Path $dataConf) {
-        Set-NginxRootDirective -ConfigPath $dataConf -ResolvedRoot $dataDir
-    }
-
-    if (Test-Path $uiConf) {
-        Set-NginxRootDirective -ConfigPath $uiConf -ResolvedRoot $uiDistDir
-    }
-}
+$layout = Get-DeploymentLayout -BaseDir $PSScriptRoot
+$environment = Import-DeploymentEnvironment -BaseDir $PSScriptRoot -EnvironmentName 'default'
+$orchestrator = Join-Path $PSScriptRoot "GhostOrchestrator.ps1"
+$uiUrl = $environment.UiUrl
+$logsDir = Join-Path $PSScriptRoot "logs"
+$requiredPorts = @($environment.RequiredPorts)
 
 function Get-ListeningPortOwners {
-    param(
-        [int[]]$Ports
-    )
+    param([int[]]$Ports)
 
     $owners = @()
     $portPattern = (($Ports | ForEach-Object { ":$_" }) -join "|")
@@ -71,19 +30,14 @@ function Get-ListeningPortOwners {
             }
         }
     }
-
     $owners | Sort-Object Port,Pid -Unique
 }
 
 function Assert-PackagePortsAvailable {
-    param(
-        [int[]]$Ports
-    )
+    param([int[]]$Ports)
 
     $owners = @(Get-ListeningPortOwners -Ports $Ports)
-    if ($owners.Count -eq 0) {
-        return
-    }
+    if ($owners.Count -eq 0) { return }
 
     Write-Host "The package cannot be started because required ports are already in use:" -ForegroundColor Red
     foreach ($owner in $owners) {
@@ -91,14 +45,12 @@ function Assert-PackagePortsAvailable {
         Write-Host "  Port $($owner.Port): PID $($owner.Pid) $($owner.ProcessName)$pathSuffix" -ForegroundColor Yellow
     }
     Write-Host ""
-    Write-Host "Stop the existing GLB Demo service or the conflicting processes, then run .\\RunPackage.ps1 again." -ForegroundColor Yellow
+    Write-Host "Stop the existing GLB Demo service or the conflicting processes, then run .\RunPackage.ps1 again." -ForegroundColor Yellow
     exit 1
 }
 
 function Assert-ServiceNotRunning {
-    param(
-        [string]$Name
-    )
+    param([string]$Name)
 
     $service = Get-Service -Name $Name -ErrorAction SilentlyContinue
     if ($service -and $service.Status -ne "Stopped") {
@@ -109,25 +61,40 @@ function Assert-ServiceNotRunning {
     }
 }
 
+function Patch-NginxConfigsForLocalRun {
+    param([string]$PackageDir)
+
+    $dataDir = Join-Path $PackageDir "data"
+    $uiDistDir = Join-Path (Join-Path (Join-Path $PackageDir "services") "map-provider-ui") "dist"
+    $dataConf = Join-Path (Join-Path (Join-Path $PackageDir "nginx") "conf") "nginx-data.conf"
+    $uiConf = Join-Path (Join-Path (Join-Path $PackageDir "nginx") "conf") "nginx-ui.conf"
+
+    if (Test-Path $dataConf) {
+        Set-NginxRootDirective -ConfigPath $dataConf -ResolvedRoot $dataDir
+    }
+    if (Test-Path $uiConf) {
+        Set-NginxRootDirective -ConfigPath $uiConf -ResolvedRoot $uiDistDir
+    }
+}
+
 if (-not (Test-Path $orchestrator)) {
     throw "GhostOrchestrator.ps1 was not found at $orchestrator"
 }
-
-if (-not (Test-Path $logsDir)) {
-    New-Item -ItemType Directory -Path $logsDir | Out-Null
-}
+if (-not (Test-Path $logsDir)) { New-Item -ItemType Directory -Path $logsDir | Out-Null }
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  GLB Demo - Run Package Locally" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Package: $BASE" -ForegroundColor White
+Write-Host "Package: $PSScriptRoot" -ForegroundColor White
 Write-Host "UI URL:  $uiUrl" -ForegroundColor White
 Write-Host "Logs:    $logsDir" -ForegroundColor White
 Write-Host ""
-Assert-ServiceNotRunning -Name $serviceName
+
+Assert-ServiceNotRunning -Name $environment.ServiceName
 Assert-PackagePortsAvailable -Ports $requiredPorts
-Patch-NginxConfigsForLocalRun -PackageDir $BASE
+Patch-NginxConfigsForLocalRun -PackageDir $PSScriptRoot
+
 Write-Host "Running GhostOrchestrator.ps1 in the foreground." -ForegroundColor Yellow
 Write-Host "Use Ctrl+C to stop all child processes." -ForegroundColor Yellow
 Write-Host ""
