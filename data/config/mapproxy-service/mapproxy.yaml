@@ -1,0 +1,44 @@
+services:
+  demo:
+  tms:
+  wmts:
+  wms:
+    md:
+      title: "MapProxy Service"
+
+layers:
+  - name: israel_rgb_4326
+    title: Israel RGB 4326 GeoPackage
+    sources: [israel_rgb_4326_cache]
+  - name: primary
+    title: Primary GeoPackage
+    sources: [primary_cache]
+  - name: secondary
+    title: Secondary GeoPackage
+    sources: [secondary_cache]
+
+caches:
+  israel_rgb_4326_cache:
+    grids: [GLOBAL_GEODETIC]
+    sources: [israel_rgb_4326_source]
+  primary_cache:
+    grids: [GLOBAL_GEODETIC]
+    sources: [primary_source]
+  secondary_cache:
+    grids: [GLOBAL_GEODETIC]
+    sources: [secondary_source]
+
+sources:
+  israel_rgb_4326_source:
+    type: tile
+    url: file://${ISRAEL_RGB_4326_GPKG_PATH}
+  primary_source:
+    type: tile
+    url: file://${PRIMARY_GPKG_PATH}
+  secondary_source:
+    type: tile
+    url: file://${SECONDARY_GPKG_PATH}
+
+grids:
+  GLOBAL_GEODETIC:
+    base: GLOBAL_GEODETIC

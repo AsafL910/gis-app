@@ -118,6 +118,7 @@ Write-Host "[2/6] Building application services..." -ForegroundColor Cyan
 
 $heightServerDir = Join-Path $projectRoot "height-server"
 $mapProviderDir = Join-Path $projectRoot "map-provider"
+$mapProxyServiceDir = Join-Path $projectRoot "mapproxy-service"
 $mapProviderUiDir = Join-Path $projectRoot "map-provider-ui"
 $mapManagerDir = Join-Path $projectRoot "map-manager"
 $mongoTransactionDemoDir = Join-Path $projectRoot "mongo-transaction-demo"
@@ -137,6 +138,15 @@ Invoke-WithCleanPythonEnv -Command {
     Invoke-Step -Description "pixi install (map-provider)" -Command { pixi install }
 }
 Test-PythonEnv -Name "map-provider" -PythonExe (Join-Path $mapProviderDir ".pixi\envs\default\python.exe") -InlineCheck "import rasterio, titiler.core, uvicorn; print('map-provider runtime ok')"
+Pop-Location
+Write-Host "    Done." -ForegroundColor Green
+
+Write-Host "  Resolving Pixi env for mapproxy-service..." -ForegroundColor Yellow
+Push-Location $mapProxyServiceDir
+Invoke-WithCleanPythonEnv -Command {
+    Invoke-Step -Description "pixi install (mapproxy-service)" -Command { pixi install }
+}
+Test-PythonEnv -Name "mapproxy-service" -PythonExe (Join-Path $mapProxyServiceDir ".pixi\envs\default\python.exe") -InlineCheck "import mapproxy; from mapproxy.script.util import main; print('mapproxy-service runtime ok')"
 Pop-Location
 Write-Host "    Done." -ForegroundColor Green
 
@@ -218,6 +228,18 @@ Copy-ServiceFolder -Name "map-provider source + Pixi env" -CopyCommand {
     Copy-Item (Join-Path $mapProviderDir "pixi.toml") $destination
     Copy-Item (Join-Path $mapProviderDir "pixi.lock") $destination
     Copy-Item -Recurse (Join-Path $mapProviderDir ".pixi") (Join-Path $destination ".pixi")
+    Get-ChildItem -Path $destination -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force
+}
+
+Copy-ServiceFolder -Name "mapproxy-service source + Pixi env" -CopyCommand {
+    $destination = Join-Path $packageServiceDir "mapproxy-service"
+    New-Item -ItemType Directory -Path $destination | Out-Null
+    Copy-Item -Recurse (Join-Path $mapProxyServiceDir "src") (Join-Path $destination "src")
+    Copy-Item (Join-Path $mapProxyServiceDir "pixi.toml") $destination
+    if (Test-Path (Join-Path $mapProxyServiceDir "pixi.lock")) {
+        Copy-Item (Join-Path $mapProxyServiceDir "pixi.lock") $destination
+    }
+    Copy-Item -Recurse (Join-Path $mapProxyServiceDir ".pixi") (Join-Path $destination ".pixi")
     Get-ChildItem -Path $destination -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force
 }
 

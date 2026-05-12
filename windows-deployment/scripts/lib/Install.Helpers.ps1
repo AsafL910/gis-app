@@ -239,9 +239,7 @@ function Initialize-ServiceConfigDefaults {
             New-Item -ItemType Directory -Force -Path $targetParent | Out-Null
         }
 
-        if (-not (Test-Path $targetPath)) {
-            Copy-Item -LiteralPath $sourcePath -Destination $targetPath
-        }
+        Copy-Item -LiteralPath $sourcePath -Destination $targetPath -Force
     }
 }
 

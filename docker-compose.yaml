@@ -57,3 +57,15 @@ services:
     environment:
       DATA_DIR: /data
     command: pixi run start
+
+  mapproxy-service:
+    build: ./mapproxy-service
+    container_name: mapproxy_service
+    ports:
+      - "8070:8070"
+    volumes:
+      - ./mapproxy-service/src:/app/src
+      - ./data:/data
+    environment:
+      SERVICE_CONFIG_PATH: /data/config/mapproxy-service/config.json
+    command: pixi run start

@@ -134,7 +134,13 @@ function Start-ManifestService {
                 }
             }
 
-            $args = "-m uvicorn $($Cfg.module) --host 0.0.0.0 --port $($Cfg.internal_port)"
+            if ($Cfg.script) {
+                $scriptPath = Join-Path $workDir $Cfg.script
+                $extraArgs = if ($Cfg.arguments) { " $($Cfg.arguments)" } else { "" }
+                $args = "`"$scriptPath`"$extraArgs"
+            } else {
+                $args = "-m uvicorn $($Cfg.module) --host 0.0.0.0 --port $($Cfg.internal_port)"
+            }
             return Start-ServiceProcess -Name $Name -Exe $exe -Arguments $args -WorkDir $workDir -EnvVars $envHash -DataDir $DataDir -LogDir $LogDir
         }
         "node" {

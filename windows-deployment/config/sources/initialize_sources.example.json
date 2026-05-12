@@ -18,6 +18,13 @@
       },
       "target_path": "gis-app\\map-provider"
     },
+    "mapproxy-service": {
+      "source": {
+        "type": "git",
+        "url": "https://example.com/org/mapproxy-service.git"
+      },
+      "target_path": "gis-app\\mapproxy-service"
+    },
     "map-manager": {
       "source": {
         "type": "git",

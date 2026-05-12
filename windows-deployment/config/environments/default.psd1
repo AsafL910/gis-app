@@ -2,7 +2,7 @@
     ServiceName = 'GlbDemoService'
     DefaultInstallDir = 'C:\Program Files\GlbDemo'
     UiUrl = 'http://localhost:8013'
-    RequiredPorts = @(8000, 8001, 8002, 8011, 8013, 27017)
+    RequiredPorts = @(8000, 8001, 8002, 8011, 8013, 8070, 27017)
     ToolVersions = @{
         Node = '20.18.1'
         Nginx = '1.30.0'

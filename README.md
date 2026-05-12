@@ -11,6 +11,7 @@ Key services:
 - `map-provider-ui`: React/OpenLayers frontend for browsing layers, creating map sets, and running polygon height queries.
 - `map-manager`: Node.js/TypeScript service for cataloging source files, creating VRT map sets, and storing the currently selected DTM for the UI.
 - `map-provider`: FastAPI + TiTiler service for listing available rasters and serving tile layers.
+- `mapproxy-service`: Separate MapProxy wrapper service that runs `mapproxy-util serve-develop` from a seeded JSON config plus YAML template.
 - `height-server`: FastAPI + GDAL service for elevation lookups and highest-point calculations.
 - `data-http`: Nginx file server exposing the shared `data/` directory for direct COG access.
 - `mongo-transaction-demo`: .NET 8 example worker that opens a MongoDB transaction against the packaged replica set.
@@ -39,6 +40,7 @@ Default ports:
 
 - UI: `http://localhost:8013`
 - Map provider API: `http://localhost:8010`
+- MapProxy service: `http://localhost:8070`
 - Height API: `http://localhost:8009`
 - Map manager API: `http://localhost:8008`
 - Shared data HTTP: `http://localhost:8011`

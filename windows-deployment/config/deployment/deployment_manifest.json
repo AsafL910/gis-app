@@ -60,6 +60,17 @@
         "SERVICE_CONFIG_PATH": "${DATA_DIR}\\config\\map-provider\\config.json"
       }
     },
+    "mapproxy-service": {
+      "type": "python",
+      "port": 8070,
+      "internal_port": 8070,
+      "script": "src\\run_mapproxy.py",
+      "working_dir": "services\\mapproxy-service",
+      "python_exe": "services\\mapproxy-service\\.pixi\\envs\\default\\python.exe",
+      "env": {
+        "SERVICE_CONFIG_PATH": "${DATA_DIR}\\config\\mapproxy-service\\config.json"
+      }
+    },
     "map-manager": {
       "type": "node",
       "port": 8008,

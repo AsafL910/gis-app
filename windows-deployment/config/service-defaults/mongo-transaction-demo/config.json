@@ -1,1 +1,9 @@
-{}
+{
+  "serviceName": "mongo-transaction-demo",
+  "mongo": {
+    "connectionString": "mongodb://127.0.0.1:27017/?replicaSet=glb-rs0",
+    "database": "glb_demo",
+    "collection": "transaction_demo",
+    "retrySeconds": 5
+  }
+}

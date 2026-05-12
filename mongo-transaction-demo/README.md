@@ -2,7 +2,27 @@
 
 This is a minimal .NET 8 worker that retries until MongoDB is ready, opens a session, writes one document inside a transaction, commits it, and then stays alive.
 
-Default environment variables:
+Default configuration can be read from `SERVICE_CONFIG_PATH`, for example:
+
+```json
+{
+  "serviceName": "mongo-transaction-demo",
+  "mongo": {
+    "connectionString": "mongodb://127.0.0.1:27017/?replicaSet=glb-rs0",
+    "database": "glb_demo",
+    "collection": "transaction_demo",
+    "retrySeconds": 5
+  }
+}
+```
+
+When deployed through the Windows package, the manifest points `SERVICE_CONFIG_PATH` at:
+
+- `C:\Program Files\GlbDemo\data\config\mongo-transaction-demo\config.json`
+
+Environment variables still override the JSON values when they are present.
+
+Supported environment variables:
 
 - `MONGO_CONNECTION_STRING=mongodb://127.0.0.1:27017/?replicaSet=glb-rs0`
 - `MONGO_DATABASE=glb_demo`

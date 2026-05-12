@@ -1,0 +1,11 @@
+{
+  "host": "0.0.0.0",
+  "port": 8070,
+  "mapproxy_yaml": "${DATA_DIR}\\config\\mapproxy-service\\mapproxy.yaml",
+  "generated_yaml_path": "${DATA_DIR}\\config\\mapproxy-service\\mapproxy.rendered.yaml",
+  "environment": {
+    "ISRAEL_RGB_4326_GPKG_PATH": "${DATA_DIR}\\raster\\israel_RGB_4326.gpkg",
+    "PRIMARY_GPKG_PATH": "${DATA_DIR}\\raster\\primary.gpkg",
+    "SECONDARY_GPKG_PATH": "${DATA_DIR}\\raster\\secondary.gpkg"
+  }
+}

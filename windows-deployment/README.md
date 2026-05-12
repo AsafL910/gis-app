@@ -73,9 +73,9 @@ What the installer does:
 
 - it removes the old installed runtime tree under `C:\Program Files\GlbDemo` except `data/`
 - that means removed service binaries disappear automatically on reinstall
-- it preserves `data/`, so service data and config are not deleted automatically
+- it preserves `data/`, but service config under `data/config/` is rewritten from the packaged defaults during install
 
-That last rule is intentional. If you remove a service permanently, you can manually clean:
+That split is intentional. If you remove a service permanently, you can manually clean:
 
 ```text
 C:\Program Files\GlbDemo\data\config\<service-name>\
@@ -171,6 +171,7 @@ Windows SCM
       -> nginx.exe
       -> .pixi Python
       -> .pixi Python
+      -> .pixi Python
       -> node.exe
 ```
 
@@ -236,8 +237,8 @@ The deployment now uses one standard config convention for services:
 - package defaults live under [`config/service-defaults/`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/config/service-defaults/)
 - install-time persisted config lives under:
   `C:\Program Files\GlbDemo\data\config\<service-name>\`
-- the installer seeds defaults only when a config file does not already exist
-- service upgrades do not overwrite client-edited config files
+- the installer rewrites installed config files from the packaged defaults on each install
+- service data outside `data/config/` is still preserved across reinstalls
 
 Runtime wiring:
 

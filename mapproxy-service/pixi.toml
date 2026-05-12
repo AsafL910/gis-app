@@ -1,0 +1,21 @@
+[workspace]
+authors = ["Asaf Lumer <asaflumer@gmail.com>"]
+channels = [
+    "conda-forge",
+    "https://repo.anaconda.com/pkgs/main",
+    "https://repo.anaconda.com/pkgs/r",
+    "https://repo.anaconda.com/pkgs/msys2",
+]
+name = "mapproxy-service"
+platforms = ["win-64", "linux-64"]
+version = "0.1.0"
+
+[tasks]
+start = "python src/run_mapproxy.py"
+
+[dependencies]
+python = "==3.12"
+pip = "*"
+
+[pypi-dependencies]
+mapproxy = "*"
