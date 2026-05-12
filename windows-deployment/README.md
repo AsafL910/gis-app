@@ -1,17 +1,163 @@
-# Windows Deployment - GLB Demo
+# Windows Deployment
 
-This folder builds an offline Windows deployment package that runs the full GIS stack as a single Windows Service.
+This folder builds the offline Windows package for the GLB demo and keeps the deployment logic organized for day-to-day maintenance.
 
-## Important Change
+The rule of thumb is:
 
-The Python services now use their own copied Pixi environments instead of a shared embedded Python with `pip install`.
+- root files are entrypoints people run
+- `config/` holds canonical configuration
+- `scripts/` holds reusable implementation
+- `tools/` holds bundled build-time inputs
+- `deploy_package/` is the final assembled payload
 
-That means the offline package is built from the already-resolved service environments:
+## Folder Map
 
-- `height-server/.pixi`
-- `map-provider/.pixi`
+```text
+windows-deployment/
+  build_package.ps1
+  build_installer_exe.ps1
+  initialize_sources.ps1
+  install.ps1
+  RunPackage.ps1
+  GhostOrchestrator.ps1
+  README.md
+  config/
+    deployment/
+      deployment_manifest.json
+      GlbDemoService.xml
+      nginx-data.conf
+      nginx-ui.conf
+    environments/
+      default.psd1
+    sources/
+      initialize_sources.example.json
+  scripts/
+    lib/
+  bootstrapper/
+  tools/
+  deploy_package/
+```
 
-No runtime `pip install` is needed on the target Windows machine.
+## What To Run
+
+Normal packaging flow:
+
+```powershell
+cd D:\Courses\MAPS\israel\glb-demo\gis-app\windows-deployment
+.\initialize_sources.ps1 -Manifest .\config\sources\initialize_sources.example.json
+.\build_package.ps1
+.\build_installer_exe.ps1
+```
+
+Target-machine install:
+
+```powershell
+.\Setup.exe
+```
+
+SCCM-style silent install:
+
+```text
+Setup.exe /quiet /log C:\Windows\Temp\GlbDemoInstall.log
+```
+
+## Service Lifecycle Rules
+
+When you remove a service:
+
+- delete its build/package logic from [`scripts/build/Build-Package.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/scripts/build/Build-Package.ps1)
+- delete its runtime entry from [`config/deployment/deployment_manifest.json`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/config/deployment/deployment_manifest.json)
+- rebuild and reinstall
+
+What the installer does:
+
+- it removes the old installed runtime tree under `C:\Program Files\GlbDemo` except `data/`
+- that means removed service binaries disappear automatically on reinstall
+- it preserves `data/`, so service data and config are not deleted automatically
+
+That last rule is intentional. If you remove a service permanently, you can manually clean:
+
+```text
+C:\Program Files\GlbDemo\data\config\<service-name>\
+```
+
+after you confirm you no longer need it.
+
+## Clear Build And Install Order
+
+Build order:
+
+1. `initialize_sources.ps1`
+   Populates repos, runtime zips, and artifacts before packaging.
+2. `build_package.ps1`
+   Resolves service dependencies, builds services, and assembles `deploy_package\`.
+3. `build_installer_exe.ps1`
+   Compiles `Setup.exe` and drops it into `deploy_package\`.
+
+Install order inside `install.ps1`:
+
+1. Stop the existing service and release file locks.
+2. Copy package files into the install directory.
+3. Patch Nginx config paths for the target machine.
+4. Create logs and register the Windows service.
+5. Start the service and verify the UI comes up.
+
+That order is implemented in [`install.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/install.ps1).
+
+## Where Junior Devs Should Edit
+
+When adding or changing a service, start here:
+
+- [`config/deployment/deployment_manifest.json`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/config/deployment/deployment_manifest.json)
+  Add the runtime service definition used by the orchestrator.
+- [`build_package.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/build_package.ps1)
+  Add the build step and package-copy step for the new service.
+- [`config/environments/default.psd1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/config/environments/default.psd1)
+  Update shared settings like ports, tool versions, install defaults, and key config paths.
+- [`config/service-defaults/README.md`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/config/service-defaults/README.md)
+  Add the default `config.json` template that should be seeded for new installs.
+
+Checklist for adding a new service:
+
+1. Add the service runtime definition in [`config/deployment/deployment_manifest.json`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/config/deployment/deployment_manifest.json).
+2. Add its build and package copy logic in [`scripts/build/Build-Package.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/scripts/build/Build-Package.ps1).
+3. Add a default config template under [`config/service-defaults/`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/config/service-defaults/).
+4. Set `SERVICE_CONFIG_PATH` in the service `env` block so the runtime knows where to read config from.
+5. If the service needs a new external port, add it to [`config/environments/default.psd1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/config/environments/default.psd1).
+
+When changing runtime behavior, start here:
+
+- [`GhostOrchestrator.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/GhostOrchestrator.ps1)
+  Main runtime startup loop.
+- [`scripts/lib/Runtime.Helpers.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/scripts/lib/Runtime.Helpers.ps1)
+  Shared helpers for service launch, environment variables, and Mongo replica set setup.
+
+When changing installation behavior, start here:
+
+- [`install.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/install.ps1)
+  The ordered install pipeline.
+- [`scripts/lib/Install.Helpers.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/scripts/lib/Install.Helpers.ps1)
+  Shared helpers for locking, copying, uninstall, and diagnostics.
+
+When changing build tooling or layout, start here:
+
+- [`scripts/lib/Layout.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/scripts/lib/Layout.ps1)
+  Shared path layout and environment loading.
+- [`scripts/lib/Common.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/scripts/lib/Common.ps1)
+  Reusable generic helpers.
+
+## Script Layout
+
+Runnable scripts stay at the top level:
+
+- [`build_package.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/build_package.ps1)
+- [`build_installer_exe.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/build_installer_exe.ps1)
+- [`initialize_sources.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/initialize_sources.ps1)
+- [`install.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/install.ps1)
+- [`RunPackage.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/RunPackage.ps1)
+- [`GhostOrchestrator.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/GhostOrchestrator.ps1)
+
+Only shared helper code lives under `scripts/lib/`.
 
 ## Runtime Architecture
 
@@ -19,131 +165,99 @@ No runtime `pip install` is needed on the target Windows machine.
 Windows SCM
   -> GlbDemoService (WinSW)
     -> GhostOrchestrator.ps1
-      -> mongod.exe             mongo-db (single-node replica set)
-      -> dotnet.exe             mongo-transaction-demo
-      -> nginx.exe              data-http
-      -> nginx.exe              map-provider-ui
-      -> .pixi Python           height-server
-      -> .pixi Python           map-provider
-      -> node.exe               map-manager
+      -> mongod.exe
+      -> dotnet.exe
+      -> nginx.exe
+      -> nginx.exe
+      -> .pixi Python
+      -> .pixi Python
+      -> node.exe
 ```
+
+The service definitions that drive this are in [`config/deployment/deployment_manifest.json`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/config/deployment/deployment_manifest.json).
 
 ## Package Layout
 
+After `build_package.ps1`, the payload is organized like this:
+
 ```text
 deploy_package/
+  Setup.exe
+  install.ps1
+  RunPackage.ps1
+  GhostOrchestrator.ps1
   GlbDemoService.exe
   GlbDemoService.xml
-  GhostOrchestrator.ps1
-  RunPackage.ps1
-  deployment_manifest.json
-  install.ps1
-  node/
-    node.exe
-  dotnet/
-    dotnet.exe
-  mongodb/
-    bin/
-      mongod.exe
-  mongosh/
-    bin/
-      mongosh.exe
-  nginx/
-    nginx.exe
-    conf/
+  config/
+    deployment/
+    environments/
+    service-defaults/
+  scripts/
+    lib/
   services/
-    height-server/
-      src/
-      pixi.toml
-      pixi.lock
-      .pixi/
-    map-provider/
-      src/
-      pixi.toml
-      .pixi/
-    map-manager/
-      dist/
-      node_modules/
-      package.json
-    mongo-transaction-demo/
-      MongoTransactionDemo.dll
-    map-provider-ui/
-      dist/
+  node/
+  dotnet/
+  mongodb/
+  mongosh/
+  nginx/
   data/
 ```
 
-## Initialize And Build
+## Initialize Sources
 
-Run this on a developer machine after preparing an initialization manifest.
+[`config/sources/initialize_sources.example.json`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/config/sources/initialize_sources.example.json) is the reference manifest for non-monorepo setups.
 
-```powershell
-cd gis-app\windows-deployment
-.\initialize_sources.ps1 -Manifest .\initialize_sources.example.json
-.\build_package.ps1
-```
+It supports:
 
-The initializer is the setup step before packaging. It can:
+- `git` sources for service repos
+- `artifact` sources for Artifactory downloads and runtime zips
+- `local` sources for machine-local inputs
 
-- clone service repos from git
-- download runtime tools from Artifactory or another artifact store
-- download MongoDB portable runtimes from Artifactory or another artifact store
-- unpack exported environments such as `.pixi`
-- copy local inputs such as shared data folders
-
-By default it does not overwrite existing content. If you want it to replace an existing repo, file, or folder, run it with:
+Plan mode:
 
 ```powershell
-.\initialize_sources.ps1 -Manifest .\initialize_sources.example.json -OverwriteExisting
+.\initialize_sources.ps1 -Manifest .\config\sources\initialize_sources.example.json -PlanOnly
 ```
 
-`build_package.ps1` still expects these runtime inputs to exist under `windows-deployment/tools/`:
-
-- Node.js portable zip
-- Nginx portable zip
-- `WinSW-x64.exe`
-- .NET SDK portable zip
-- MongoDB portable zip
-- mongosh portable zip
-
-After initialization, the build script will:
-
-- use bundled portable Node.js, Nginx, and WinSW inputs
-- use bundled portable .NET SDK input for build and runtime
-- use bundled portable MongoDB and mongosh inputs
-- run `pixi install` in `height-server` and `map-provider`
-- run runtime smoke checks for the bundled Python environments before packaging
-- build the frontend and map-manager
-- publish the example .NET 8 Mongo transaction worker
-- assemble `deploy_package/`
-
-The `.NET` example uses a project-local `NuGet.Config`. Point it at `nuget.org` or your Artifactory NuGet mirror depending on how your build environment is allowed to restore packages.
-
-## Install
-
-Copy `deploy_package/` to the target Windows machine and run:
+Overwrite mode:
 
 ```powershell
-.\install.ps1
+.\initialize_sources.ps1 -Manifest .\config\sources\initialize_sources.example.json -OverwriteExisting
 ```
 
-Run it as Administrator.
+## Tools
 
-## Local Package Debug
+Build-time bundled inputs live under `tools/`. See [`tools/README.md`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/tools/README.md).
 
-Before installing the Windows Service, you can validate the package directly:
+## Configuration Model
+
+The deployment now uses one standard config convention for services:
+
+- package defaults live under [`config/service-defaults/`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/config/service-defaults/)
+- install-time persisted config lives under:
+  `C:\Program Files\GlbDemo\data\config\<service-name>\`
+- the installer seeds defaults only when a config file does not already exist
+- service upgrades do not overwrite client-edited config files
+
+Runtime wiring:
+
+- the deployment manifest can set `SERVICE_CONFIG_PATH`
+- `${DATA_DIR}` and `${BASE_DIR}` placeholders are resolved by the orchestrator before launching the service
+
+Example:
+
+```json
+"env": {
+  "SERVICE_CONFIG_PATH": "${DATA_DIR}\\config\\my-service\\config.json"
+}
+```
+
+## Local Runtime Debug
+
+To debug the package without installing the Windows service:
 
 ```powershell
 .\RunPackage.ps1
 ```
 
-This runs `GhostOrchestrator.ps1` in the foreground and is the recommended first check when debugging package startup. It avoids WinSW and makes it easier to confirm whether the packaged services themselves can start.
-
-## Notes
-
-- The Python executables used at runtime are the service-local Pixi interpreters referenced in `deployment_manifest.json`.
-- MongoDB is bundled as a portable runtime and started by the orchestrator with `--replSet` so future services can rely on replica-set-only features such as transactions or change streams.
-- `mongo-transaction-demo` is a bundled .NET 8 example that retries until MongoDB is ready and then commits a document inside a transaction.
-- For this packaging model, MongoDB does not need an MSI installer. The portable zip plus `mongosh` is enough.
-- If you update Python dependencies, rebuild the package so the copied `.pixi` environments stay in sync.
-- WinSW is bundled into `deploy_package` as `GlbDemoService.exe`, so the target machine does not need separate access to WinSW.
-- The same offline treatment applies to other portable runtime tools in the package, such as Node.js and Nginx.
+That runs the packaged orchestrator in the foreground and is the fastest way to see whether the assembled payload itself is healthy.

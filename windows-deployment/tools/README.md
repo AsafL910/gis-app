@@ -1,10 +1,10 @@
 # Bundled Tool Inputs
 
-`build_package.ps1` does not download runtime tools anymore.
+This folder holds build-time runtime inputs used by [`build_package.ps1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/build_package.ps1).
 
-Before running the build, place these files in this `tools/` folder:
+Canonical versions live in [`config/environments/default.psd1`](/D:/Courses/MAPS/israel/glb-demo/gis-app/windows-deployment/config/environments/default.psd1).
 
-## Required files
+## Required For The Recommended Flow
 
 - `node-v20.18.1-win-x64.zip`
 - `nginx-1.30.0.zip`
@@ -13,9 +13,9 @@ Before running the build, place these files in this `tools/` folder:
 - `mongodb-windows-x86_64-8.3.1.zip`
 - `mongosh-2.8.3-win32-x64.zip`
 
-## Optional extracted folders
+## Optional Extracted Folders
 
-The build script will also accept these extracted folders if they already exist:
+If these extracted folders already exist, the matching zip is not needed:
 
 - `node-v20.18.1-win-x64/`
 - `nginx-1.30.0/`
@@ -23,24 +23,27 @@ The build script will also accept these extracted folders if they already exist:
 - `mongodb-win32-x86_64-windows-8.3.1/`
 - `mongosh-2.8.3-win32-x64/`
 
-If an extracted folder exists, the corresponding zip is not needed.
+MongoDB is the odd one:
 
-For MongoDB specifically, the downloaded zip is named `mongodb-windows-x86_64-8.3.1.zip`, but it extracts into `mongodb-win32-x86_64-windows-8.3.1/`.
+- download name: `mongodb-windows-x86_64-8.3.1.zip`
+- extracted folder: `mongodb-win32-x86_64-windows-8.3.1/`
 
-## Typical flow
+## Typical Flow
 
-1. Populate `tools/` on a machine that has internet access.
-2. Keep those files under your private build storage or source archive.
-3. Run:
+1. Populate `tools/` on a machine with internet access or via Artifactory.
+2. Run:
 
 ```powershell
 .\build_package.ps1
+.\build_installer_exe.ps1
 ```
+
+3. Deliver `deploy_package\` to the target machine.
 
 ## Notes
 
 - These are build-time bundled inputs.
-- `deploy_package/` will include the runtime pieces needed on the target machine.
+- `deploy_package\` contains the runtime pieces needed on the target machine.
 - `WinSW-x64.exe` is copied into the package as `GlbDemoService.exe`.
-- The portable .NET SDK is used as the build tool and is also bundled so packaged .NET services can run via `dotnet.exe`.
-- MongoDB runs from the portable zip layout in the package; no MSI install is required for this deployment model.
+- The portable .NET SDK is used both to build the example service and to run packaged .NET services via `dotnet.exe`.
+- MongoDB runs from the portable zip layout in the package, so no MongoDB installer is needed.

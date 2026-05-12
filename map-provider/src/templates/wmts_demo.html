@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GeoPackage WMTS Demo</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 34%),
+        linear-gradient(180deg, #07111f 0%, #091827 100%);
+      color: #e5eef7;
+      min-height: 100vh;
+    }
+    .shell {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px;
+      display: grid;
+      gap: 18px;
+    }
+    .hero, .card {
+      background: rgba(8, 15, 28, 0.88);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 18px;
+      box-shadow: 0 24px 60px rgba(2, 6, 23, 0.38);
+    }
+    .hero {
+      padding: 24px;
+      display: grid;
+      gap: 12px;
+    }
+    h1, h2, p { margin: 0; }
+    h1 { font-size: 30px; }
+    p { color: #b8c6d8; line-height: 1.6; }
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    a {
+      color: #7dd3fc;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    a:hover { text-decoration: underline; }
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+      gap: 18px;
+    }
+    .card {
+      padding: 20px;
+      display: grid;
+      gap: 14px;
+    }
+    select, input, button, textarea {
+      font: inherit;
+    }
+    select, input {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.9);
+      color: #f8fafc;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    button {
+      background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+      color: white;
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    button:hover { filter: brightness(1.06); }
+    .preview {
+      min-height: 420px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      background:
+        linear-gradient(45deg, rgba(148,163,184,0.08) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(148,163,184,0.08) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(148,163,184,0.08) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(148,163,184,0.08) 75%);
+      background-size: 24px 24px;
+      background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .preview img {
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: 12px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.42);
+    }
+    .code {
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 12px;
+      padding: 12px;
+      color: #dbeafe;
+      overflow: auto;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+    }
+    .stat {
+      display: grid;
+      gap: 6px;
+    }
+    @media (max-width: 980px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      .shell {
+        padding: 16px;
+      }
+      .preview {
+        min-height: 300px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <h1>GeoPackage WMTS Demo</h1>
+      <p>
+        This page exposes the GeoPackage-backed WMTS service with no cache and no YAML config. It publishes
+        `GetCapabilities`, supports KVP and REST tile requests, and advertises the same configured layers used by the API.
+      </p>
+      <div class="links">
+        <a href="/wmts/1.0.0/WMTSCapabilities.xml" target="_blank" rel="noreferrer">Open GetCapabilities XML</a>
+        <a href="/demo" target="_blank" rel="noreferrer">Open raster preview demo</a>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h2>Tile Preview</h2>
+        <label class="label" for="layer-select">Layer</label>
+        <select id="layer-select"></select>
+        <label class="label" for="zoom">Zoom level</label>
+        <input id="zoom" type="number" min="0" max="22" value="8" />
+        <button id="render" type="button">Render Sample Tile</button>
+        <div class="preview">
+          <img id="preview-image" alt="WMTS tile preview" />
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Layer Details</h2>
+        <div class="stat">
+          <span class="label">Capabilities URL</span>
+          <div class="code" id="capabilities-url"></div>
+        </div>
+        <div class="stat">
+          <span class="label">KVP Example</span>
+          <div class="code" id="kvp-url"></div>
+        </div>
+        <div class="stat">
+          <span class="label">REST Template</span>
+          <div class="code" id="rest-url"></div>
+        </div>
+        <div class="stat">
+          <span class="label">Coverage</span>
+          <div class="code" id="bounds"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const previewImage = document.getElementById("preview-image");
+    const layerSelect = document.getElementById("layer-select");
+    const zoomInput = document.getElementById("zoom");
+    const restUrl = document.getElementById("rest-url");
+    const kvpUrl = document.getElementById("kvp-url");
+    const bounds = document.getElementById("bounds");
+    const capabilitiesUrl = document.getElementById("capabilities-url");
+    const layers = [];
+
+    function centerTileFromBounds(bounds4326, zoom) {
+      const [minLon, minLat, maxLon, maxLat] = bounds4326;
+      const lon = (minLon + maxLon) / 2;
+      const lat = (minLat + maxLat) / 2;
+      const scale = Math.pow(2, zoom);
+      const x = Math.floor((lon + 180) / 360 * scale);
+      const latRad = lat * Math.PI / 180;
+      const y = Math.floor(
+        (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * scale
+      );
+      return { x, y };
+    }
+
+    function getActiveLayer() {
+      return layers.find((layer) => layer.identifier === layerSelect.value) || null;
+    }
+
+    function renderMetadata(layer, zoom) {
+      capabilitiesUrl.textContent = `${location.origin}${layer.capabilities_url}`;
+      const { x, y } = centerTileFromBounds(layer.bounds.epsg4326, zoom);
+      kvpUrl.textContent =
+        `${location.origin}/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0` +
+        `&LAYER=${encodeURIComponent(layer.identifier)}` +
+        `&STYLE=default&FORMAT=image/png&TILEMATRIXSET=WebMercatorQuad` +
+        `&TILEMATRIX=${zoom}&TILEROW=${y}&TILECOL=${x}`;
+      restUrl.textContent =
+        `${location.origin}${layer.rest_tile_url.replace("{z}", String(zoom)).replace("{y}", String(y)).replace("{x}", String(x))}`;
+      bounds.textContent = JSON.stringify(layer.bounds, null, 2);
+    }
+
+    function renderSample() {
+      const layer = getActiveLayer();
+      if (!layer) {
+        return;
+      }
+      const zoom = Math.max(0, Math.min(22, Number(zoomInput.value) || 0));
+      const { x, y } = centerTileFromBounds(layer.bounds.epsg4326, zoom);
+      const url = layer.rest_tile_url
+        .replace("{z}", String(zoom))
+        .replace("{y}", String(y))
+        .replace("{x}", String(x));
+      previewImage.src = url;
+      renderMetadata(layer, zoom);
+    }
+
+    async function loadLayers() {
+      const response = await fetch("/wmts/layers");
+      const payload = await response.json();
+      payload.layers.forEach((layer) => layers.push(layer));
+      layerSelect.innerHTML = "";
+
+      layers.forEach((layer) => {
+        const option = document.createElement("option");
+        option.value = layer.identifier;
+        option.textContent = `${layer.name} (${layer.path})`;
+        layerSelect.appendChild(option);
+      });
+
+      if (layers.length > 0) {
+        renderSample();
+      }
+    }
+
+    layerSelect.addEventListener("change", renderSample);
+    zoomInput.addEventListener("change", renderSample);
+    document.getElementById("render").addEventListener("click", renderSample);
+
+    loadLayers().catch((error) => {
+      previewImage.alt = `Failed to load WMTS layers: ${error}`;
+    });
+  </script>
+</body>
+</html>

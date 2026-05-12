@@ -1,8 +1,6 @@
 {
   "version": "1.0.0",
-
   "_comment": "Each Python service carries its own Pixi env (includes Python + GDAL + all deps). No shared Python runtime.",
-
   "services": {
     "mongo-db": {
       "type": "mongo",
@@ -20,6 +18,7 @@
       "entry": "MongoTransactionDemo.dll",
       "env": {
         "SERVICE_NAME": "mongo-transaction-demo",
+        "SERVICE_CONFIG_PATH": "${DATA_DIR}\\config\\mongo-transaction-demo\\config.json",
         "MONGO_CONNECTION_STRING": "mongodb://127.0.0.1:27017/?replicaSet=glb-rs0",
         "MONGO_DATABASE": "glb_demo",
         "MONGO_COLLECTION": "transaction_demo",
@@ -44,6 +43,7 @@
       "working_dir": "services\\height-server",
       "python_exe": "services\\height-server\\.pixi\\envs\\default\\python.exe",
       "env": {
+        "SERVICE_CONFIG_PATH": "${DATA_DIR}\\config\\height-server\\config.json",
         "ELEV_FILENAME": "dtm\\israel_merged.vrt",
         "TOP_ELEV_FILENAME": "israel_top_cog.tif",
         "BOTTOM_ELEV_FILENAME": "israel_bottom_cog.tif"
@@ -56,7 +56,9 @@
       "module": "src.main:app",
       "working_dir": "services\\map-provider",
       "python_exe": "services\\map-provider\\.pixi\\envs\\default\\python.exe",
-      "env": {}
+      "env": {
+        "SERVICE_CONFIG_PATH": "${DATA_DIR}\\config\\map-provider\\config.json"
+      }
     },
     "map-manager": {
       "type": "node",
@@ -65,7 +67,8 @@
       "entry": "dist\\index.js",
       "working_dir": "services\\map-manager",
       "env": {
-        "PORT": "8002"
+        "PORT": "8002",
+        "SERVICE_CONFIG_PATH": "${DATA_DIR}\\config\\map-manager\\config.json"
       }
     }
   }

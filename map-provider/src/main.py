@@ -4,6 +4,7 @@ from titiler.core.factory import TilerFactory
 
 from src.routes.metadata import router as metadata_router
 from src.routes.preview import router as preview_router
+from src.routes.wmts import router as wmts_router
 
 
 app = FastAPI(
@@ -21,6 +22,7 @@ cog = TilerFactory()
 app.include_router(cog.router, prefix="/cog", tags=["COG Tiles"])
 app.include_router(metadata_router)
 app.include_router(preview_router)
+app.include_router(wmts_router)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,11 @@ export type LayerRecord = {
   name: string;
   path: string;
   url: string;
+  provider?: "cog" | "wmts";
+  tile_url?: string;
+  capabilities_url?: string;
+  demo_url?: string;
+  source_modes?: SourceMode[];
 };
 
 export type LayersResponse = {

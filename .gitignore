@@ -61,6 +61,8 @@ windows-deployment/deploy_package/
 windows-deployment/.dotnet-cli/
 windows-deployment/.nuget-packages/
 windows-deployment/.appdata/
+windows-deployment/bootstrapper/publish/
+windows-deployment/installer-output/
 
 # Generated geodata / archives
 *.vrt

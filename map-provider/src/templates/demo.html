@@ -189,8 +189,8 @@
       layerStatusEl.textContent = layerStatus;
     }
 
-    async function updateLayer(layerName) {
-      if (!layersMap[layerName]) {
+    async function updateLayer(layerPath) {
+      if (!layersMap[layerPath]) {
         previewImage.hidden = true;
         emptyState.hidden = false;
         emptyState.textContent = 'No layer selected.';
@@ -198,11 +198,11 @@
         return;
       }
 
-      const imageUrl = `${BASE}/preview?filename=${encodeURIComponent(layerName)}&max_size=1800`;
-      layerNameEl.textContent = layerName;
+      const imageUrl = `${BASE}/preview?filename=${encodeURIComponent(layerPath)}&max_size=1800`;
+      layerNameEl.textContent = layerPath;
       setStatus('Rendering preview...', 'Loading');
       emptyState.hidden = false;
-      emptyState.textContent = 'Rendering TIFF preview...';
+      emptyState.textContent = 'Rendering raster preview...';
       previewImage.hidden = true;
 
       previewImage.onload = () => {
@@ -229,18 +229,18 @@
         select.innerHTML = '';
 
         data.layers.forEach((layer) => {
-          layersMap[layer.name] = layer.url;
+          layersMap[layer.path] = layer.url;
           const option = document.createElement('option');
-          option.value = layer.name;
+          option.value = layer.path;
           option.textContent = layer.name;
           select.appendChild(option);
         });
 
         if (data.layers.length > 0) {
-          await updateLayer(data.layers[0].name);
+          await updateLayer(data.layers[0].path);
         } else {
           select.innerHTML = '<option value="">No layers found</option>';
-          emptyState.textContent = 'No TIFF layers were found in the data directory.';
+          emptyState.textContent = 'No raster layers were found in the data directory.';
           setStatus('No layers found', 'Empty');
         }
       } catch (error) {

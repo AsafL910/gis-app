@@ -1,15 +1,16 @@
 [CmdletBinding()]
 param(
-    [string]$Manifest = "initialize_sources.example.json",
+    [string]$Manifest = "config\\sources\\initialize_sources.example.json",
     [switch]$PlanOnly,
     [switch]$OverwriteExisting
 )
 
 $ErrorActionPreference = "Stop"
 
-$SCRIPT_DIR = $PSScriptRoot
-$PROJECT_ROOT = Split-Path $SCRIPT_DIR -Parent
-$PLAN_LINES = New-Object System.Collections.Generic.List[string]
+. (Join-Path $PSScriptRoot "scripts\lib\Layout.ps1")
+
+$layout = Get-DeploymentLayout -BaseDir $PSScriptRoot
+$planLines = New-Object System.Collections.Generic.List[string]
 
 function Write-Step {
     param([string]$Message)
@@ -20,15 +21,15 @@ function Write-Step {
 function Write-PlanLine {
     param([string]$Message)
 
-    $PLAN_LINES.Add($Message) | Out-Null
+    $planLines.Add($Message) | Out-Null
 }
 
 function Resolve-ProjectPath {
     param([string]$RelativePath)
 
-    $fullPath = [System.IO.Path]::GetFullPath((Join-Path $PROJECT_ROOT $RelativePath))
-    $projectRootWithSlash = $PROJECT_ROOT.TrimEnd("\") + "\"
-    if ($fullPath -ne $PROJECT_ROOT -and -not $fullPath.StartsWith($projectRootWithSlash, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $fullPath = [System.IO.Path]::GetFullPath((Join-Path $layout.ProjectRoot $RelativePath))
+    $projectRootWithSlash = $layout.ProjectRoot.TrimEnd("\") + "\"
+    if ($fullPath -ne $layout.ProjectRoot -and -not $fullPath.StartsWith($projectRootWithSlash, [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "Path '$RelativePath' resolves outside the project root."
     }
 
@@ -37,8 +38,7 @@ function Resolve-ProjectPath {
 
 function Get-EntryNames {
     param([object]$Entries)
-
-    return @($Entries.PSObject.Properties | ForEach-Object { $_.Name })
+    @($Entries.PSObject.Properties | ForEach-Object { $_.Name })
 }
 
 function Get-EntryValue {
@@ -47,14 +47,14 @@ function Get-EntryValue {
         [string]$Name
     )
 
-    return $Entries.PSObject.Properties[$Name].Value
+    $Entries.PSObject.Properties[$Name].Value
 }
 
 function Test-RepoDirty {
     param([string]$RepoPath)
 
     $status = git -C $RepoPath status --porcelain
-    return -not [string]::IsNullOrWhiteSpace(($status -join "`n"))
+    -not [string]::IsNullOrWhiteSpace(($status -join "`n"))
 }
 
 function Ensure-ParentDirectory {
@@ -69,11 +69,9 @@ function Ensure-ParentDirectory {
 function Remove-ExistingTarget {
     param([string]$TargetPath)
 
-    if (-not (Test-Path $TargetPath)) {
-        return
+    if (Test-Path $TargetPath) {
+        Remove-Item -LiteralPath $TargetPath -Recurse -Force
     }
-
-    Remove-Item -LiteralPath $TargetPath -Recurse -Force
 }
 
 function Copy-LocalSource {
@@ -109,6 +107,7 @@ function Initialize-GitSource {
     param(
         [string]$Name,
         [object]$Entry,
+        [object]$ManifestObject,
         [bool]$AllowOverwrite
     )
 
@@ -116,7 +115,7 @@ function Initialize-GitSource {
     $targetPath = Resolve-ProjectPath -RelativePath $Entry.target_path
     $ref = $source.ref
     if ([string]::IsNullOrWhiteSpace($ref)) {
-        $ref = $manifest.defaults.git_ref
+        $ref = $ManifestObject.defaults.git_ref
     }
 
     Write-Step "Initializing git source '$Name'"
@@ -161,7 +160,7 @@ function Initialize-ArtifactSource {
         throw "Target '$targetPath' already exists. Re-run with -OverwriteExisting to replace it."
     }
 
-    $cacheDir = Join-Path $SCRIPT_DIR ".downloads"
+    $cacheDir = Join-Path $layout.BaseDir ".downloads"
     New-Item -ItemType Directory -Force -Path $cacheDir | Out-Null
 
     $fileName = [System.IO.Path]::GetFileName(($source.url -split "\?")[0])
@@ -180,7 +179,6 @@ function Initialize-ArtifactSource {
         }
 
         Expand-Archive -LiteralPath $downloadPath -DestinationPath $extractDir -Force
-
         $copySource = $extractDir
         if (-not [string]::IsNullOrWhiteSpace($source.archive_subpath)) {
             $copySource = Join-Path $extractDir $source.archive_subpath
@@ -206,26 +204,21 @@ function Initialize-LocalSource {
 
     $source = $Entry.source
     $targetPath = Resolve-ProjectPath -RelativePath $Entry.target_path
-
     Write-Step "Initializing local source '$Name'"
     Copy-LocalSource -SourcePath $source.path -TargetPath $targetPath -AllowOverwrite $AllowOverwrite
 }
 
-$manifestPath = if ([System.IO.Path]::IsPathRooted($Manifest)) {
-    $Manifest
-} else {
-    Join-Path $SCRIPT_DIR $Manifest
-}
+$manifestPath = if ([System.IO.Path]::IsPathRooted($Manifest)) { $Manifest } else { Join-Path $layout.BaseDir $Manifest }
 if (-not (Test-Path $manifestPath)) {
     throw "Manifest file '$manifestPath' was not found."
 }
 
-$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+$manifestObject = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 $allowOverwrite = $OverwriteExisting.IsPresent
+$entryNames = Get-EntryNames -Entries $manifestObject.entries
 
-$entryNames = Get-EntryNames -Entries $manifest.entries
 foreach ($name in $entryNames) {
-    $entry = Get-EntryValue -Entries $manifest.entries -Name $name
+    $entry = Get-EntryValue -Entries $manifestObject.entries -Name $name
     if ([string]::IsNullOrWhiteSpace($entry.target_path)) {
         throw "Entry '$name' is missing target_path."
     }
@@ -234,9 +227,7 @@ foreach ($name in $entryNames) {
         switch ($entry.source.type) {
             "git" {
                 $ref = $entry.source.ref
-                if ([string]::IsNullOrWhiteSpace($ref)) {
-                    $ref = $manifest.defaults.git_ref
-                }
+                if ([string]::IsNullOrWhiteSpace($ref)) { $ref = $manifestObject.defaults.git_ref }
                 Write-PlanLine "[$name] git $($entry.source.url) -> $($entry.target_path) @ $ref"
             }
             "artifact" {
@@ -250,29 +241,20 @@ foreach ($name in $entryNames) {
                 throw "Entry '$name' has unsupported source.type '$($entry.source.type)'."
             }
         }
-
         continue
     }
 
     switch ($entry.source.type) {
-        "git" {
-            Initialize-GitSource -Name $name -Entry $entry -AllowOverwrite $allowOverwrite
-        }
-        "artifact" {
-            Initialize-ArtifactSource -Name $name -Entry $entry -AllowOverwrite $allowOverwrite
-        }
-        "local" {
-            Initialize-LocalSource -Name $name -Entry $entry -AllowOverwrite $allowOverwrite
-        }
-        default {
-            throw "Entry '$name' has unsupported source.type '$($entry.source.type)'."
-        }
+        "git" { Initialize-GitSource -Name $name -Entry $entry -ManifestObject $manifestObject -AllowOverwrite $allowOverwrite }
+        "artifact" { Initialize-ArtifactSource -Name $name -Entry $entry -AllowOverwrite $allowOverwrite }
+        "local" { Initialize-LocalSource -Name $name -Entry $entry -AllowOverwrite $allowOverwrite }
+        default { throw "Entry '$name' has unsupported source.type '$($entry.source.type)'." }
     }
 }
 
 if ($PlanOnly) {
-    if ($PLAN_LINES.Count -gt 0) {
-        Write-Output ($PLAN_LINES -join [Environment]::NewLine)
+    if ($planLines.Count -gt 0) {
+        Write-Output ($planLines -join [Environment]::NewLine)
     }
     Write-Host ""
     Write-Host "Plan complete. No files were changed." -ForegroundColor Green

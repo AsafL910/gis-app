@@ -58,13 +58,14 @@ function App() {
     [layers, selectedLayerPath]
   );
   const isTerrainMode = rasterMode !== "imagery";
+  const supportsDirect = activeLayer?.source_modes?.includes("direct") ?? true;
 
   const directCogUrl = activeLayer
     ? `${DIRECT_DATA_BASE}/${encodeDataPath(activeLayer.path)}`
     : "";
 
   const proxyTileUrl = activeLayer
-    ? `${API_BASE}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodeURIComponent(activeLayer.url)}`
+    ? activeLayer.tile_url ?? `${API_BASE}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?url=${encodeURIComponent(activeLayer.url)}`
     : "";
 
   function addLog(message: string) {
@@ -151,6 +152,13 @@ function App() {
     }
     setRasterMode(getDefaultRasterMode(activeLayer.name));
   }, [activeLayer?.name]);
+
+  useEffect(() => {
+    if (sourceMode === "direct" && !supportsDirect) {
+      setSourceMode("proxy");
+      addLog(`Direct mode is unavailable for ${activeLayer?.path ?? "this layer"}, switched to proxy`);
+    }
+  }, [activeLayer?.path, sourceMode, supportsDirect]);
 
   useEffect(() => {
     if (!mapElementRef.current || mapRef.current) {
@@ -255,6 +263,12 @@ function App() {
       rasterLayerRef.current = rasterLayer;
       setStatus("Proxy raster attached");
       addLog(`Attached proxy layer ${activeLayer.path}`);
+      return;
+    }
+
+    if (!supportsDirect) {
+      setStatus("Direct mode unavailable");
+      addLog(`Layer ${activeLayer.path} only supports proxy access`);
       return;
     }
 
@@ -527,6 +541,7 @@ function App() {
               type="button"
               className={sourceMode === "direct" ? "segment active" : "segment"}
               onClick={() => setSourceMode("direct")}
+              disabled={!supportsDirect}
             >
               Direct COG
             </button>

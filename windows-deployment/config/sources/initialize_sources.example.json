@@ -1,0 +1,84 @@
+{
+  "defaults": {
+    "git_ref": "main"
+  },
+  "entries": {
+    "height-server": {
+      "source": {
+        "type": "git",
+        "url": "https://example.com/org/height-server.git",
+        "ref": "release/0.2"
+      },
+      "target_path": "gis-app\\height-server"
+    },
+    "map-provider": {
+      "source": {
+        "type": "git",
+        "url": "https://example.com/org/map-provider.git"
+      },
+      "target_path": "gis-app\\map-provider"
+    },
+    "map-manager": {
+      "source": {
+        "type": "git",
+        "url": "https://example.com/org/map-manager.git"
+      },
+      "target_path": "gis-app\\map-manager"
+    },
+    "map-provider-ui": {
+      "source": {
+        "type": "git",
+        "url": "https://example.com/org/map-provider-ui.git"
+      },
+      "target_path": "gis-app\\map-provider-ui"
+    },
+    "node-runtime": {
+      "source": {
+        "type": "artifact",
+        "url": "https://artifactory.example.com/generic/node/node-v20.18.1-win-x64.zip",
+        "unpack": false
+      },
+      "target_path": "gis-app\\windows-deployment\\tools\\node-v20.18.1-win-x64.zip"
+    },
+    "nginx-runtime": {
+      "source": {
+        "type": "artifact",
+        "url": "https://artifactory.example.com/generic/nginx/nginx-1.30.0.zip",
+        "unpack": false
+      },
+      "target_path": "gis-app\\windows-deployment\\tools\\nginx-1.30.0.zip"
+    },
+    "winsw": {
+      "source": {
+        "type": "artifact",
+        "url": "https://artifactory.example.com/generic/winsw/WinSW-x64.exe",
+        "unpack": false
+      },
+      "target_path": "gis-app\\windows-deployment\\tools\\WinSW-x64.exe"
+    },
+    "mongodb-runtime": {
+      "source": {
+        "type": "artifact",
+        "url": "https://artifactory.example.com/generic/mongodb/mongodb-windows-x86_64-8.3.1.zip",
+        "unpack": false
+      },
+      "target_path": "gis-app\\windows-deployment\\tools\\mongodb-windows-x86_64-8.3.1.zip"
+    },
+    "mongosh-runtime": {
+      "source": {
+        "type": "artifact",
+        "url": "https://artifactory.example.com/generic/mongodb/mongosh-2.8.3-win32-x64.zip",
+        "unpack": false
+      },
+      "target_path": "gis-app\\windows-deployment\\tools\\mongosh-2.8.3-win32-x64.zip"
+    },
+    "dotnet-sdk": {
+      "source": {
+        "type": "artifact",
+        "url": "https://artifactory.example.com/generic/dotnet/dotnet-sdk-8.0.420-win-x64.zip",
+        "unpack": false
+      },
+      "target_path": "gis-app\\windows-deployment\\tools\\dotnet-sdk-8.0.420-win-x64.zip"
+    }
+  }
+}
